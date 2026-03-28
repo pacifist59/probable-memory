@@ -19,20 +19,14 @@
         }
     </script>
     <script>
-        // Check system preference and set dark mode
         if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
             document.documentElement.classList.add('dark');
         } else {
             document.documentElement.classList.remove('dark');
         }
-        
-        // Listen for system changes
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-            if (e.matches) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
+            if (e.matches) document.documentElement.classList.add('dark');
+            else document.documentElement.classList.remove('dark');
         });
     </script>
     <!-- Supabase SDK -->
@@ -42,15 +36,43 @@
 </head>
 <body class="bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 font-sans transition-colors duration-300">
 
+    <!-- Login Modal -->
+    <div id="login-modal" class="fixed inset-0 z-[110] hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:p-0">
+            <div class="fixed inset-0 bg-gray-900/75 backdrop-blur-sm transition-opacity" onclick="toggleLoginModal(false)"></div>
+            <div class="inline-block align-middle bg-white dark:bg-gray-900 rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full border border-gray-100 dark:border-gray-800 p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-black dark:text-white">로그인</h3>
+                    <button onclick="toggleLoginModal(false)" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl"><i class="fas fa-times"></i></button>
+                </div>
+                <form id="login-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">이메일</label>
+                        <input type="email" name="email" required class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none" placeholder="example@email.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">비밀번호</label>
+                        <input type="password" name="password" required class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none" placeholder="********">
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <button type="submit" id="login-btn" class="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-black hover:bg-indigo-700 transition">로그인</button>
+                        <button type="button" id="signup-btn" class="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white py-3 rounded-xl font-black hover:bg-gray-200 dark:hover:bg-gray-700 transition">회원가입</button>
+                    </div>
+                    <p class="text-xs text-gray-400 text-center mt-4 italic">로그인하여 선곡표를 작성하고 수정해보세요.</p>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Add Setlist Modal -->
     <div id="add-modal" class="fixed inset-0 z-[100] hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
         <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div class="fixed inset-0 bg-gray-900/75 backdrop-blur-sm transition-opacity" aria-hidden="true" onclick="toggleModal(false)"></div>
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div class="inline-block align-bottom bg-white dark:bg-gray-900 rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full border border-gray-100 dark:border-gray-800">
+            <div class="inline-block align-bottom bg-white dark:bg-gray-900 rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-gray-100 dark:border-gray-800">
                 <div class="bg-white dark:bg-gray-900 px-8 pt-8 pb-8">
                     <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-2xl font-black dark:text-white" id="modal-title">새 세트리스트 등록</h3>
+                        <h3 class="text-2xl font-black dark:text-white" id="modal-title">새 선곡표 등록</h3>
                         <button onclick="toggleModal(false)" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl"><i class="fas fa-times"></i></button>
                     </div>
                     <form id="setlist-form" class="space-y-5">
@@ -78,6 +100,10 @@
                                 <input type="text" name="location" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none" placeholder="예: 서울, 대한민국">
                             </div>
                         </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">선곡 목록 (곡 제목을 줄바꿈으로 구분)</label>
+                            <textarea name="songs_text" rows="8" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none resize-none font-mono text-sm" placeholder="1. 노래 제목&#10;2. 다음 노래&#10;..."></textarea>
+                        </div>
                         <button type="submit" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-indigo-700 transition shadow-lg shadow-indigo-500/30">등록하기</button>
                     </form>
                 </div>
@@ -92,9 +118,8 @@
                 <div class="flex items-center">
                     <a href="/" class="text-4xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter italic mr-4">선곡표</a>
                     <div class="hidden md:ml-8 md:flex md:space-x-8">
-                        <a href="#" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold">아티스트</a>
-                        <a href="#" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold">공연장</a>
-                        <a href="#" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold">페스티벌</a>
+                        <a href="#" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold text-lg">아티스트</a>
+                        <a href="#" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold text-lg">공연장</a>
                     </div>
                 </div>
                 <div class="flex-1 max-w-md mx-8 hidden sm:block">
@@ -102,12 +127,13 @@
                         <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
                             <i class="fas fa-search"></i>
                         </span>
-                        <input type="text" class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-full leading-5 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent sm:text-sm transition-colors" placeholder="아티스트, 공연명 검색...">
+                        <input type="text" class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-full bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 sm:text-sm transition-colors" placeholder="아티스트, 공연명 검색...">
                     </div>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <button class="text-sm font-bold text-gray-700 dark:text-gray-300 hover:text-indigo-600">로그인</button>
-                    <button class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-700 transition shadow-md shadow-indigo-500/20">회원가입</button>
+                <div class="flex items-center space-x-4" id="auth-buttons">
+                    <!-- Auth buttons will be injected here -->
+                    <button onclick="toggleLoginModal(true)" class="text-sm font-bold text-gray-700 dark:text-gray-300 hover:text-indigo-600">로그인</button>
+                    <button onclick="toggleLoginModal(true)" class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-700 transition shadow-md shadow-indigo-500/20">회원가입</button>
                 </div>
             </div>
         </div>
@@ -115,80 +141,55 @@
 
     <!-- Hero Section -->
     <header class="relative bg-indigo-900 text-white py-28 px-4 overflow-hidden">
-        <!-- Background Image with Overlay -->
         <div class="absolute inset-0 z-0">
             <img src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=1920&q=80" alt="Concert Background" class="w-full h-full object-cover opacity-40 grayscale-[20%]">
             <div class="absolute inset-0 bg-gradient-to-b from-indigo-950/60 via-indigo-950/80 to-gray-50 dark:to-gray-950"></div>
         </div>
-
         <div class="max-w-7xl mx-auto text-center relative z-10">
-            <h1 class="text-5xl md:text-7xl font-black mb-8 tracking-tight">어제 그 공연의 감동을<br><span class="text-indigo-300 underline decoration-indigo-500/30">세트리스트</span>로 다시 느껴보세요.</h1>
+            <h1 class="text-5xl md:text-7xl font-black mb-8 tracking-tight">어제 그 공연의 감동을<br><span class="text-indigo-300 underline decoration-indigo-500/30">선곡표</span>로 다시 느껴보세요.</h1>
             <p class="text-xl md:text-2xl text-indigo-100 mb-12 max-w-3xl mx-auto font-medium opacity-90">전 세계 아티스트의 공연 세트리스트를 검색하고, 나만의 공연 기록을 공유하세요.</p>
             <div class="flex flex-col sm:flex-row justify-center gap-5">
-                <button class="bg-white text-indigo-900 px-10 py-4 rounded-2xl font-black text-xl hover:bg-indigo-50 transition shadow-xl hover:scale-105 transform">최근 세트리스트 보기</button>
-                <button onclick="toggleModal(true)" class="bg-indigo-600/40 backdrop-blur-xl text-white px-10 py-4 rounded-2xl font-black text-xl hover:bg-indigo-600/60 transition border border-white/20 hover:scale-105 transform">직접 세트리스트 추가</button>
+                <button class="bg-white text-indigo-900 px-10 py-4 rounded-2xl font-black text-xl hover:bg-indigo-50 transition shadow-xl hover:scale-105 transform">최근 선곡표 보기</button>
+                <button onclick="handleCheckAuthBeforeAdd()" class="bg-indigo-600/40 backdrop-blur-xl text-white px-10 py-4 rounded-2xl font-black text-xl hover:bg-indigo-600/60 transition border border-white/20 hover:scale-105 transform">직접 선곡표 추가</button>
             </div>
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 relative -mt-8 z-20">
-        
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
-            
-            <!-- Recent Setlists (Left 2/3) -->
             <div class="lg:col-span-2">
                 <div class="flex items-center justify-between mb-10">
-                    <h2 class="text-3xl font-black text-gray-900 dark:text-white">최근 공연 세트리스트</h2>
-                    <a href="#" class="text-indigo-600 dark:text-indigo-400 font-bold hover:underline">모두 보기 <i class="fas fa-chevron-right ml-1 text-xs"></i></a>
+                    <h2 class="text-3xl font-black text-gray-900 dark:text-white">최근 공연 선곡표</h2>
+                    <a href="#" class="text-indigo-600 dark:text-indigo-400 font-bold hover:underline font-lg">모두 보기 <i class="fas fa-chevron-right ml-1 text-xs"></i></a>
                 </div>
-                
-                <div class="space-y-6" id="recent-list">
-                    <!-- Dynamic Items will be loaded here via JS -->
-                </div>
+                <div class="space-y-6" id="recent-list"></div>
             </div>
-
-            <!-- Sidebar (Right 1/3) -->
             <div class="space-y-8">
-                <!-- Trending Artists -->
-                <div class="bg-white dark:bg-gray-900 p-8 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm transition-colors">
+                <div class="bg-white dark:bg-gray-900 p-8 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
                     <h3 class="text-xl font-black mb-6 dark:text-white">인기 아티스트</h3>
                     <ul class="space-y-5" id="trending-artists">
                         <li class="flex items-center justify-between">
                             <span class="font-bold text-gray-800 dark:text-gray-200 text-lg">아이유 (IU)</span>
-                            <span class="text-sm text-gray-500 dark:text-gray-400 font-medium bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full">12 세트리스트</span>
-                        </li>
-                        <li class="flex items-center justify-between">
-                            <span class="font-bold text-gray-800 dark:text-gray-200 text-lg">데이식스 (DAY6)</span>
-                            <span class="text-sm text-gray-500 dark:text-gray-400 font-medium bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full">8 세트리스트</span>
+                            <span class="text-sm text-gray-500 dark:text-gray-400 font-medium bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full">12 선곡표</span>
                         </li>
                     </ul>
                 </div>
-
-                <!-- Banner/Call to action -->
                 <div class="bg-gradient-to-br from-indigo-600 to-purple-700 p-8 rounded-3xl text-white shadow-lg shadow-indigo-500/30">
                     <h3 class="font-black text-2xl mb-3">공연을 관람하셨나요?</h3>
                     <p class="text-indigo-100 mb-6 leading-relaxed font-medium">기억하고 있는 곡 목록을 추가하여 다른 팬들과 공유해보세요!</p>
-                    <button onclick="toggleModal(true)" class="w-full bg-white text-indigo-700 py-3.5 rounded-2xl font-black text-lg hover:bg-indigo-50 transition shadow-md">지금 작성하기</button>
+                    <button onclick="handleCheckAuthBeforeAdd()" class="w-full bg-white text-indigo-700 py-3.5 rounded-2xl font-black text-lg hover:bg-indigo-50 transition shadow-md">지금 작성하기</button>
                 </div>
             </div>
         </div>
-
     </main>
 
-    <footer class="bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 py-16 mt-12 transition-colors">
+    <footer class="bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 py-16 mt-12">
         <div class="max-w-7xl mx-auto px-4 text-center">
             <p class="text-gray-500 dark:text-gray-400 font-bold">© 2026 선곡표. All rights reserved.</p>
-            <div class="mt-6 flex justify-center space-x-8 text-gray-400 dark:text-gray-500 font-bold">
+            <div class="mt-6 flex justify-center space-x-8 text-gray-400 dark:text-gray-500 font-bold font-lg">
                 <a href="#" class="hover:text-gray-600 dark:hover:text-gray-300">개인정보처리방침</a>
                 <a href="#" class="hover:text-gray-600 dark:hover:text-gray-300">이용약관</a>
                 <a href="#" class="hover:text-gray-600 dark:hover:text-gray-300">문의하기</a>
-            </div>
-        </div>
-    </footer>
-                <a href="#" class="hover:text-gray-600">개인정보처리방침</a>
-                <a href="#" class="hover:text-gray-600">이용약관</a>
-                <a href="#" class="hover:text-gray-600">문의하기</a>
             </div>
         </div>
     </footer>
