@@ -1,199 +1,215 @@
 // Supabase configuration
 const SUPABASE_URL = 'https://yyjghcsnomwvqwpaojug.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5amdoY3Nub213dnF3cGFvanVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2NzQzNzAsImV4cCI6MjA5MDI1MDM3MH0.HANV95lxI1XgXTALkqXDbe_-U2-_yB2xJD4Zsb-pqf0';
-
-// Global Supabase Client
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+let currentSetlistId = null;
+let isEditMode = false;
+
 // Modal handling
-window.toggleModal = function(show) {
-    const modal = document.getElementById('add-modal');
-    if (!modal) return;
-    if (show) {
-        modal.classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-    } else {
-        modal.classList.add('hidden');
-        document.body.style.overflow = 'auto';
-    }
+window.toggleModal = (show) => {
+    const m = document.getElementById('add-modal');
+    if (m) { m.classList.toggle('hidden', !show); document.body.style.overflow = show ? 'hidden' : 'auto'; }
+}
+window.toggleAuthModal = (show) => {
+    const m = document.getElementById('auth-modal');
+    if (m) { m.classList.toggle('hidden', !show); document.body.style.overflow = show ? 'hidden' : 'auto'; }
+}
+window.toggleDetailModal = (show) => {
+    const m = document.getElementById('detail-modal');
+    if (m) { m.classList.toggle('hidden', !show); document.body.style.overflow = show ? 'hidden' : 'auto'; }
+    if (!show) isEditMode = false;
 }
 
-window.toggleAuthModal = function(show) {
-    const modal = document.getElementById('auth-modal');
-    if (!modal) return;
-    if (show) {
-        modal.classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-    } else {
-        modal.classList.add('hidden');
-        document.body.style.overflow = 'auto';
-    }
-}
-
-// Auth Logic
+// Auth UI
 async function updateAuthUI() {
     const { data: { session } } = await sb.auth.getSession();
-    const authContainer = document.getElementById('auth-buttons');
-    if (!authContainer) return;
+    const container = document.getElementById('auth-buttons');
+    if (!container) return;
 
     if (session) {
-        // Find a name to display: Full Name > Nickname > Email prefix
-        const userDisplayName = session.user.user_metadata?.full_name || 
-                                session.user.user_metadata?.name || 
-                                session.user.email.split('@')[0];
-
-        authContainer.innerHTML = `
+        const name = session.user.user_metadata?.full_name || session.user.email.split('@')[0];
+        container.innerHTML = `
             <div class="flex items-center gap-4">
-                <div class="flex items-center gap-3 bg-gray-100 dark:bg-gray-800 pl-2 pr-4 py-1.5 rounded-2xl border border-gray-200 dark:border-gray-700">
-                    <img src="${session.user.user_metadata?.avatar_url || 'https://ui-avatars.com/api/?name='+userDisplayName}" class="w-8 h-8 rounded-xl shadow-sm" alt="profile">
-                    <span class="text-sm font-black text-gray-700 dark:text-gray-200 hidden lg:inline">${userDisplayName}</span>
+                <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1 pr-4 rounded-2xl border border-gray-200 dark:border-gray-700">
+                    <img src="${session.user.user_metadata?.avatar_url || 'https://ui-avatars.com/api/?name='+name}" class="w-8 h-8 rounded-xl shadow-sm" alt="p">
+                    <span class="text-sm font-black text-gray-700 dark:text-gray-200 hidden lg:inline">${name}</span>
                 </div>
-                <button id="logout-btn" class="text-sm font-black text-gray-500 hover:text-red-500 transition-colors">로그아웃</button>
+                <button id="logout-btn" class="text-xs font-black text-gray-400 hover:text-red-500 transition-colors">로그아웃</button>
             </div>
         `;
-        document.getElementById('logout-btn')?.addEventListener('click', async () => {
-            await sb.auth.signOut();
-            updateAuthUI();
-        });
+        document.getElementById('logout-btn')?.addEventListener('click', async () => { await sb.auth.signOut(); updateAuthUI(); });
     } else {
-        authContainer.innerHTML = `
-            <button onclick="toggleAuthModal(true)" class="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black text-base hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20 active:scale-95">로그인</button>
-        `;
+        container.innerHTML = `<button onclick="toggleAuthModal(true)" class="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20 active:scale-95">로그인</button>`;
     }
 }
 
-window.handleSocialLogin = async function(provider) {
-    try {
-        const { error } = await sb.auth.signInWithOAuth({
-            provider: provider,
-            options: {
-                redirectTo: window.location.origin
-            }
-        });
-        if (error) throw error;
-    } catch (err) {
-        alert(`${provider} 로그인 설정이 필요합니다.\nSupabase 대시보드에서 Client ID와 Secret을 입력해주세요.`);
-    }
+window.handleSocialLogin = async (provider) => {
+    try { await sb.auth.signInWithOAuth({ provider, options: { redirectTo: window.location.origin } }); } 
+    catch (err) { alert(`${provider} 로그인 설정이 필요합니다.`); }
 }
 
-window.handleCheckAuthBeforeAdd = async function() {
+window.handleCheckAuthBeforeAdd = async () => {
     const { data: { session } } = await sb.auth.getSession();
-    if (!session) {
-        alert('선곡표를 작성하려면 로그인이 필요합니다.');
-        toggleAuthModal(true);
-    } else {
-        toggleModal(true);
-    }
+    if (!session) { alert('선곡표를 작성하려면 로그인이 필요합니다.'); toggleAuthModal(true); } 
+    else toggleModal(true);
 }
 
-// Date helper
-function getRelativeTime(dateString) {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInSeconds = Math.floor((now - date) / 1000);
-    if (diffInSeconds < 60) return '방금 전';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}분 전`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}시간 전`;
-    return `${Math.floor(diffInSeconds / 86400)}일 전`;
+// Render Functions
+function getRelativeTime(d) {
+    const diff = Math.floor((new Date() - new Date(d)) / 1000);
+    if (diff < 60) return '방금 전'; if (diff < 3600) return `${Math.floor(diff/60)}분 전`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}시간 전`; return `${Math.floor(diff/86400)}일 전`;
 }
 
-// Fetch and Render
 async function fetchAndRenderSetlists() {
-    const listElement = document.getElementById('recent-list');
-    if (!listElement) return;
-
-    listElement.innerHTML = `<div class="animate-pulse space-y-6"><div class="h-32 bg-gray-100 dark:bg-gray-800 rounded-[2rem] w-full"></div><div class="h-32 bg-gray-100 dark:bg-gray-800 rounded-[2rem] w-full"></div></div>`;
-
+    const list = document.getElementById('recent-list');
+    if (!list) return;
+    list.innerHTML = `<div class="animate-pulse space-y-6"><div class="h-32 bg-gray-100 dark:bg-gray-800 rounded-[2rem] w-full"></div></div>`;
     try {
         const { data, error } = await sb.from('setlists').select('*').order('created_at', { ascending: false });
         if (error) throw error;
-
-        if (!data || data.length === 0) {
-            listElement.innerHTML = `
-                <div class="text-center py-24 bg-white dark:bg-gray-900 rounded-[2.5rem] border-2 border-dashed border-gray-100 dark:border-gray-800">
-                    <div class="w-24 h-24 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-8">
-                        <i class="fas fa-music text-4xl text-gray-300"></i>
-                    </div>
-                    <p class="text-gray-500 dark:text-gray-400 font-black text-xl">아직 등록된 선곡표가 없습니다.</p>
-                </div>`;
-            return;
-        }
-
-        listElement.innerHTML = data.map(item => `
-            <div class="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-8 group hover:-translate-y-2 relative overflow-hidden">
-                <div class="flex items-center space-x-8 relative z-10">
+        if (!data?.length) { list.innerHTML = `<p class="text-center py-20 text-gray-400 font-bold">아직 등록된 선곡표가 없습니다.</p>`; return; }
+        list.innerHTML = data.map(item => `
+            <div onclick="openDetail('${item.id}')" class="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-8 group hover:-translate-y-2">
+                <div class="flex items-center space-x-8">
                     <div class="bg-indigo-50 dark:bg-indigo-900/20 w-20 h-20 rounded-[1.5rem] flex items-center justify-center text-indigo-600 dark:text-indigo-400 flex-shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500 shadow-inner">
                         <i class="fas fa-microphone-alt text-3xl"></i>
                     </div>
                     <div>
-                        <h3 class="font-black text-2xl text-gray-900 dark:text-white group-hover:text-indigo-600 transition-colors tracking-tight">${item.artist}</h3>
+                        <h3 class="font-black text-2xl dark:text-white group-hover:text-indigo-600 transition-colors tracking-tight">${item.artist}</h3>
                         <p class="text-lg text-gray-500 dark:text-gray-400 font-bold mt-1">${item.concert}</p>
-                        <div class="flex items-center mt-3 text-sm text-gray-400 dark:text-gray-500 font-black space-x-5">
-                            <span><i class="fas fa-map-marker-alt mr-2 text-indigo-500"></i> ${item.venue || '공연장 정보 없음'}</span>
-                            <span class="flex items-center"><i class="fas fa-list-ul mr-2 text-purple-500"></i> ${item.songs?.length || 0} 곡</span>
+                        <div class="flex items-center mt-3 text-sm text-gray-400 font-black space-x-5">
+                            <span><i class="fas fa-map-marker-alt mr-2 text-indigo-500"></i> ${item.venue || '정보 없음'}</span>
+                            <span><i class="fas fa-list-ul mr-2 text-purple-500"></i> ${item.songs?.length || 0} 곡</span>
                         </div>
                     </div>
                 </div>
-                <div class="flex flex-row md:flex-col items-center md:items-end justify-between relative z-10 pt-6 md:pt-0 border-t md:border-t-0 border-gray-50 dark:border-gray-800">
-                    <span class="text-xl font-black text-gray-800 dark:text-gray-200">${item.performance_date}</span>
-                    <span class="text-xs font-black text-gray-400 mt-2 uppercase tracking-[0.2em] bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-full">${getRelativeTime(item.created_at)}</span>
+                <div class="flex flex-row md:flex-col items-center md:items-end justify-between border-t md:border-t-0 border-gray-50 dark:border-gray-800 pt-6 md:pt-0">
+                    <span class="text-xl font-black dark:text-gray-200">${item.performance_date}</span>
+                    <span class="text-xs font-black text-gray-400 mt-2 tracking-widest bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-full">${getRelativeTime(item.created_at)}</span>
                 </div>
             </div>
         `).join('');
-    } catch (err) {
-        console.error(err);
-        listElement.innerHTML = `<div class="bg-red-50 dark:bg-red-900/20 p-10 rounded-[2.5rem] text-red-600 dark:text-red-400 font-black text-center">데이터 로딩 실패</div>`;
-    }
+    } catch (err) { console.error(err); }
 }
 
-// Initialize
+window.openDetail = async (id) => {
+    currentSetlistId = id;
+    toggleDetailModal(true);
+    const content = document.getElementById('detail-content');
+    content.innerHTML = `<div class="animate-pulse space-y-6"><div class="h-8 bg-gray-100 dark:bg-gray-800 rounded-xl w-1/3"></div><div class="h-40 bg-gray-100 dark:bg-gray-800 rounded-3xl w-full"></div></div>`;
+    
+    try {
+        const { data, error } = await sb.from('setlists').select('*').eq('id', id).single();
+        if (error) throw error;
+        renderDetailView(data);
+    } catch (err) { alert('데이터를 불러오지 못했습니다.'); }
+}
+
+async function renderDetailView(data) {
+    const { data: { session } } = await sb.auth.getSession();
+    const content = document.getElementById('detail-content');
+    
+    const songsHtml = data.songs?.length 
+        ? data.songs.map((s, i) => `
+            <div class="flex items-center gap-6 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
+                <span class="text-2xl font-black text-indigo-200 dark:text-gray-700 group-hover:text-indigo-500 transition-colors">${String(i + 1).padStart(2, '0')}</span>
+                <span class="text-lg font-bold dark:text-gray-200">${s}</span>
+            </div>
+        `).join('')
+        : `<p class="text-gray-400 font-bold py-10 text-center">곡 목록이 아직 등록되지 않았습니다.</p>`;
+
+    content.innerHTML = `
+        <div class="flex justify-between items-start mb-10">
+            <button onclick="toggleDetailModal(false)" class="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors text-2xl"><i class="fas fa-arrow-left"></i></button>
+            <div class="flex gap-3">
+                ${session ? `<button onclick="startEdit()" class="px-6 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl font-black text-sm hover:bg-indigo-600 hover:text-white transition-all">수정하기</button>` : ''}
+                <button onclick="alert('복사되었습니다!')" class="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all"><i class="fas fa-share-alt"></i></button>
+            </div>
+        </div>
+        <div class="mb-12">
+            <h2 class="text-5xl font-black dark:text-white tracking-tighter mb-4">${data.artist}</h2>
+            <p class="text-2xl font-bold text-gray-500 dark:text-gray-400 mb-6">${data.concert}</p>
+            <div class="flex flex-wrap gap-4">
+                <span class="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-5 py-2 rounded-full font-black text-sm"><i class="fas fa-calendar mr-2"></i> ${data.performance_date}</span>
+                <span class="bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-5 py-2 rounded-full font-black text-sm"><i class="fas fa-map-marker-alt mr-2 text-indigo-500"></i> ${data.venue}</span>
+            </div>
+        </div>
+        <div class="space-y-2">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-black dark:text-white uppercase tracking-widest text-indigo-500">SETLIST</h3>
+                <span class="text-sm font-bold text-gray-400">${data.songs?.length || 0} TRACKS</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+                ${songsHtml}
+            </div>
+        </div>
+    `;
+}
+
+window.startEdit = async () => {
+    isEditMode = true;
+    const { data } = await sb.from('setlists').select('*').eq('id', currentSetlistId).single();
+    const content = document.getElementById('detail-content');
+    content.innerHTML = `
+        <div class="flex justify-between items-center mb-8">
+            <h3 class="text-3xl font-black dark:text-white">선곡표 수정 (Wiki)</h3>
+            <button onclick="openDetail('${currentSetlistId}')" class="text-gray-400 hover:text-white text-2xl"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="edit-form" class="space-y-6">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-1">
+                    <label class="text-xs font-black text-gray-400 uppercase ml-1">아티스트</label>
+                    <input type="text" name="artist" value="${data.artist}" required class="w-full px-5 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-black text-gray-400 uppercase ml-1">공연 날짜</label>
+                    <input type="date" name="performance_date" value="${data.performance_date}" required class="w-full px-5 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none">
+                </div>
+            </div>
+            <div class="space-y-1">
+                <label class="text-xs font-black text-gray-400 uppercase ml-1">공연 명</label>
+                <input type="text" name="concert" value="${data.concert}" required class="w-full px-5 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none">
+            </div>
+            <div class="space-y-1">
+                <label class="text-xs font-black text-gray-400 uppercase ml-1">곡 목록 (줄바꿈 구분)</label>
+                <textarea name="songs_text" rows="10" class="w-full px-5 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none resize-none font-medium">${data.songs?.join('\n') || ''}</textarea>
+            </div>
+            <div class="flex gap-4">
+                <button type="submit" class="flex-1 bg-indigo-600 text-white py-5 rounded-2xl font-black text-xl hover:bg-indigo-700 shadow-xl transition-all">수정 완료</button>
+                <button type="button" onclick="openDetail('${currentSetlistId}')" class="px-8 bg-gray-100 dark:bg-gray-800 dark:text-white py-5 rounded-2xl font-black">취소</button>
+            </div>
+        </form>
+    `;
+
+    document.getElementById('edit-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.target);
+        const updateData = {
+            artist: f.get('artist'),
+            performance_date: f.get('performance_date'),
+            concert: f.get('concert'),
+            songs: f.get('songs_text').split('\n').map(s => s.trim().replace(/^\d+\.\s*/, '')).filter(s => s)
+        };
+        const { error } = await sb.from('setlists').update(updateData).eq('id', currentSetlistId);
+        if (error) alert('수정 실패'); else { alert('수정되었습니다!'); openDetail(currentSetlistId); fetchAndRenderSetlists(); }
+    };
+}
+
+// Init
 document.addEventListener('DOMContentLoaded', () => {
     fetchAndRenderSetlists();
     updateAuthUI();
-
-    // Setlist Form
     document.getElementById('setlist-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const { data: { session } } = await sb.auth.getSession();
-        if (!session) return alert('로그인이 필요합니다.');
-
-        const formData = new FormData(e.target);
-        const songsText = formData.get('songs_text');
-        const songs = songsText ? songsText.split('\n').map(s => s.trim().replace(/^\d+\.\s*/, '')).filter(s => s) : [];
-
-        const setlistData = {
-            artist: formData.get('artist'),
-            performance_date: formData.get('performance_date'),
-            concert: formData.get('concert'),
-            venue: formData.get('venue'),
-            location: formData.get('location'),
-            songs: songs
+        const f = new FormData(e.target);
+        const d = {
+            artist: f.get('artist'), performance_date: f.get('performance_date'), concert: f.get('concert'),
+            venue: f.get('venue'), location: f.get('location'),
+            songs: f.get('songs_text').split('\n').map(s => s.trim().replace(/^\d+\.\s*/, '')).filter(s => s)
         };
-
-        const btn = e.target.querySelector('button[type="submit"]');
-        btn.disabled = true; btn.innerText = '등록 중...';
-
-        try {
-            const { error } = await sb.from('setlists').insert([setlistData]);
-            if (error) throw error;
-            alert('성공적으로 등록되었습니다!');
-            toggleModal(false);
-            e.target.reset();
-            fetchAndRenderSetlists();
-        } catch (err) {
-            alert('등록 실패: ' + err.message);
-        } finally {
-            btn.disabled = false; btn.innerText = '등록하기';
-        }
+        const { error } = await sb.from('setlists').insert([d]);
+        if (error) alert('실패'); else { alert('등록성공!'); toggleModal(false); e.target.reset(); fetchAndRenderSetlists(); }
     });
-
-    // Handle OAuth callback (if URL contains hash)
-    if (window.location.hash || window.location.search) {
-        sb.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_IN') {
-                updateAuthUI();
-                fetchAndRenderSetlists();
-            }
-        });
-    }
 });

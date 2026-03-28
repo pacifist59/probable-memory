@@ -84,50 +84,24 @@
     </div>
 
     <!-- Add Setlist Modal -->
-    <div id="add-modal" class="fixed inset-0 z-[100] hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    ... (기존 Add Modal 코드) ...
+
+    <!-- View/Edit Detail Modal -->
+    <div id="detail-modal" class="fixed inset-0 z-[100] hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
         <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm transition-opacity" aria-hidden="true" onclick="toggleModal(false)"></div>
+            <div class="fixed inset-0 bg-gray-900/85 backdrop-blur-md transition-opacity" aria-hidden="true" onclick="toggleDetailModal(false)"></div>
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div class="inline-block align-bottom bg-white dark:bg-gray-900 rounded-[2.5rem] text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-gray-100 dark:border-gray-800">
-                <div class="bg-white dark:bg-gray-900 px-8 py-10">
-                    <div class="flex justify-between items-center mb-8">
-                        <div>
-                            <h3 class="text-3xl font-black dark:text-white tracking-tight" id="modal-title">새 선곡표 등록</h3>
-                            <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">공연의 감동을 모두와 공유하세요.</p>
+            <div class="inline-block align-bottom bg-white dark:bg-gray-900 rounded-[3rem] text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full border border-gray-100 dark:border-gray-800">
+                <div id="detail-content" class="p-8 sm:p-12 relative">
+                    <!-- Content will be injected by JS -->
+                    <div class="animate-pulse space-y-6">
+                        <div class="h-8 bg-gray-100 dark:bg-gray-800 rounded-xl w-1/3"></div>
+                        <div class="h-20 bg-gray-100 dark:bg-gray-800 rounded-2xl w-full"></div>
+                        <div class="space-y-3">
+                            <div class="h-4 bg-gray-100 dark:bg-gray-800 rounded w-full"></div>
+                            <div class="h-4 bg-gray-100 dark:bg-gray-800 rounded w-5/6"></div>
                         </div>
-                        <button onclick="toggleModal(false)" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl transition-colors"><i class="fas fa-times"></i></button>
                     </div>
-                    <form id="setlist-form" class="space-y-6">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                            <div class="space-y-1.5">
-                                <label class="text-xs font-black text-gray-400 uppercase tracking-wider ml-1">아티스트 명</label>
-                                <input type="text" name="artist" required class="w-full px-5 py-4 rounded-2xl border border-gray-200 dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none transition-all" placeholder="예: 아이유, DAY6">
-                            </div>
-                            <div class="space-y-1.5">
-                                <label class="text-xs font-black text-gray-400 uppercase tracking-wider ml-1">공연 날짜</label>
-                                <input type="date" name="performance_date" required class="w-full px-5 py-4 rounded-2xl border border-gray-200 dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none transition-all">
-                            </div>
-                        </div>
-                        <div class="space-y-1.5">
-                            <label class="text-xs font-black text-gray-400 uppercase tracking-wider ml-1">공연 명 (투어 이름)</label>
-                            <input type="text" name="concert" required class="w-full px-5 py-4 rounded-2xl border border-gray-200 dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none transition-all" placeholder="예: 2024 HEREH WORLD TOUR ENCORE">
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                            <div class="space-y-1.5">
-                                <label class="text-xs font-black text-gray-400 uppercase tracking-wider ml-1">공연장</label>
-                                <input type="text" name="venue" class="w-full px-5 py-4 rounded-2xl border border-gray-200 dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none transition-all" placeholder="예: 상암 월드컵 경기장">
-                            </div>
-                            <div class="space-y-1.5">
-                                <label class="text-xs font-black text-gray-400 uppercase tracking-wider ml-1">도시/국가</label>
-                                <input type="text" name="location" class="w-full px-5 py-4 rounded-2xl border border-gray-200 dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none transition-all" placeholder="예: 서울, 대한민국">
-                            </div>
-                        </div>
-                        <div class="space-y-1.5">
-                            <label class="text-xs font-black text-gray-400 uppercase tracking-wider ml-1">선곡 목록 (곡 제목을 엔터로 구분)</label>
-                            <textarea name="songs_text" rows="6" class="w-full px-5 py-4 rounded-2xl border border-gray-200 dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none resize-none font-medium text-sm leading-relaxed" placeholder="1. Holssi&#10;2. Jam Jam&#10;3. Ah puh&#10;..."></textarea>
-                        </div>
-                        <button type="submit" class="w-full bg-indigo-600 text-white py-5 rounded-[1.5rem] font-black text-xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-500/30 active:scale-[0.98]">등록하기</button>
-                    </form>
                 </div>
             </div>
         </div>
