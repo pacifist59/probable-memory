@@ -40,22 +40,22 @@ function renderRecentSetlists() {
     if (!listElement) return;
 
     listElement.innerHTML = recentSetlists.map(item => `
-        <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group">
-            <div class="flex items-center space-x-4">
-                <div class="bg-indigo-50 w-12 h-12 rounded-xl flex items-center justify-center text-indigo-600 flex-shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                    <i class="fas fa-microphone-alt text-xl"></i>
+        <div class="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-6 group hover:-translate-y-1">
+            <div class="flex items-center space-x-6">
+                <div class="bg-indigo-50 dark:bg-indigo-900/30 w-16 h-16 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 flex-shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+                    <i class="fas fa-microphone-alt text-2xl"></i>
                 </div>
                 <div>
-                    <h3 class="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">${item.artist}</h3>
-                    <p class="text-sm text-gray-600 font-medium">${item.concert}</p>
-                    <div class="flex items-center mt-1 text-xs text-gray-400 space-x-2">
-                        <span><i class="fas fa-map-marker-alt mr-1"></i> ${item.venue}, ${item.location}</span>
+                    <h3 class="font-black text-xl text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">${item.artist}</h3>
+                    <p class="text-base text-gray-600 dark:text-gray-400 font-bold mt-1">${item.concert}</p>
+                    <div class="flex items-center mt-2 text-sm text-gray-400 dark:text-gray-500 font-medium space-x-3">
+                        <span><i class="fas fa-map-marker-alt mr-1.5 text-indigo-500"></i> ${item.venue}, ${item.location}</span>
                     </div>
                 </div>
             </div>
-            <div class="flex flex-row md:flex-col items-center md:items-end justify-between border-t md:border-t-0 pt-3 md:pt-0 mt-3 md:mt-0">
-                <span class="text-sm font-bold text-gray-500">${item.date}</span>
-                <span class="text-[10px] text-gray-400 mt-1 uppercase tracking-wider">${item.updated} 업데이트됨</span>
+            <div class="flex flex-row md:flex-col items-center md:items-end justify-between border-t border-gray-100 dark:border-gray-800 md:border-t-0 pt-4 md:pt-0 mt-2 md:mt-0">
+                <span class="text-lg font-black text-gray-700 dark:text-gray-300">${item.date}</span>
+                <span class="text-xs font-bold text-gray-400 dark:text-gray-500 mt-1 uppercase tracking-widest bg-gray-50 dark:bg-gray-800/50 px-2.5 py-1 rounded-md">${item.updated} 업데이트됨</span>
             </div>
         </div>
     `).join('');
