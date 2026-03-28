@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K-Setlist | 국내외 공연 세트리스트 공유 서비스</title>
+    <title>선곡표 | 국내외 공연 세트리스트 공유 서비스</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
@@ -15,7 +15,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16 items-center">
                 <div class="flex items-center">
-                    <a href="/" class="text-2xl font-black text-indigo-600 tracking-tighter">K-SETLIST</a>
+                    <a href="/" class="text-2xl font-black text-indigo-600 tracking-tighter italic">선곡표</a>
                     <div class="hidden md:ml-8 md:flex md:space-x-6">
                         <a href="#" class="text-gray-600 hover:text-indigo-600 font-medium">아티스트</a>
                         <a href="#" class="text-gray-600 hover:text-indigo-600 font-medium">공연장</a>
@@ -39,18 +39,21 @@
     </nav>
 
     <!-- Hero Section -->
-    <header class="bg-indigo-900 text-white py-20 px-4 overflow-hidden relative">
+    <header class="relative bg-indigo-900 text-white py-24 px-4 overflow-hidden">
+        <!-- Background Image with Overlay -->
+        <div class="absolute inset-0 z-0">
+            <img src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=1920&q=80" alt="Concert Background" class="w-full h-full object-cover opacity-30 grayscale-[20%]">
+            <div class="absolute inset-0 bg-gradient-to-b from-indigo-900/60 via-indigo-900/80 to-indigo-900"></div>
+        </div>
+
         <div class="max-w-7xl mx-auto text-center relative z-10">
-            <h1 class="text-4xl md:text-6xl font-extrabold mb-6 tracking-tight">어제 그 공연의 감동을<br><span class="text-indigo-300">세트리스트</span>로 다시 느껴보세요.</h1>
+            <h1 class="text-4xl md:text-6xl font-extrabold mb-6 tracking-tight">어제 그 공연의 감동을<br><span class="text-indigo-300 underline decoration-indigo-500/30">세트리스트</span>로 다시 느껴보세요.</h1>
             <p class="text-lg md:text-xl text-indigo-100 mb-10 max-w-2xl mx-auto">전 세계 아티스트의 공연 세트리스트를 검색하고, 나만의 공연 기록을 공유하세요.</p>
             <div class="flex flex-col sm:flex-row justify-center gap-4">
-                <button class="bg-white text-indigo-900 px-8 py-3 rounded-xl font-bold text-lg hover:bg-indigo-50 transition">최근 세트리스트 보기</button>
-                <button class="bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold text-lg hover:bg-indigo-600 transition border border-indigo-500">직접 세트리스트 추가</button>
+                <button class="bg-white text-indigo-900 px-8 py-3 rounded-xl font-bold text-lg hover:bg-indigo-50 transition shadow-lg">최근 세트리스트 보기</button>
+                <button class="bg-indigo-600/40 backdrop-blur-md text-white px-8 py-3 rounded-xl font-bold text-lg hover:bg-indigo-600/60 transition border border-white/20">직접 세트리스트 추가</button>
             </div>
         </div>
-        <!-- Decorative element -->
-        <div class="absolute top-0 right-0 -mt-20 -mr-20 w-96 h-96 bg-indigo-500 rounded-full opacity-10 blur-3xl"></div>
-        <div class="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-purple-500 rounded-full opacity-10 blur-3xl"></div>
     </header>
 
     <!-- Main Content -->
@@ -109,7 +112,7 @@
 
     <footer class="bg-gray-100 border-t border-gray-200 py-12 mt-12">
         <div class="max-w-7xl mx-auto px-4 text-center">
-            <p class="text-gray-500 text-sm">© 2026 K-Setlist. All rights reserved.</p>
+            <p class="text-gray-500 text-sm">© 2026 선곡표. All rights reserved.</p>
             <div class="mt-4 flex justify-center space-x-6 text-gray-400">
                 <a href="#" class="hover:text-gray-600">개인정보처리방침</a>
                 <a href="#" class="hover:text-gray-600">이용약관</a>
