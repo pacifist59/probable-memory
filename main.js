@@ -45,10 +45,21 @@ async function updateAuthUI() {
 }
 
 window.handleSocialLogin = async (provider) => {
-    try { await sb.auth.signInWithOAuth({ provider, options: { redirectTo: window.location.origin } }); } 
-    catch (err) { alert(`${provider} 로그인 설정이 필요합니다.`); }
+    // Determine the current URL to ensure Supabase redirects back here
+    const redirectUrl = window.location.origin;
+    
+    try {
+        const { error } = await sb.auth.signInWithOAuth({
+            provider: provider,
+            options: {
+                redirectTo: redirectUrl
+            }
+        });
+        if (error) throw error;
+    } catch (err) {
+        alert(`${provider} 로그인 중 오류가 발생했습니다: ${err.message}`);
+    }
 }
-
 window.handleCheckAuthBeforeAdd = async () => {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) { alert('선곡표를 작성하려면 로그인이 필요합니다.'); toggleAuthModal(true); } 

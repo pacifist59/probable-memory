@@ -51,18 +51,13 @@
                     </div>
 
                     <div class="space-y-4 mb-10">
-                        <!-- Google -->
-                        <button onclick="handleSocialLogin('google')" class="group w-full flex items-center justify-between px-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 py-4.5 rounded-2xl font-black text-gray-700 dark:text-white hover:border-indigo-500 dark:hover:border-indigo-400 transition-all active:scale-[0.98] shadow-sm">
-                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-6 h-6" alt="Google">
-                            <span>Google로 계속하기</span>
-                            <i class="fas fa-arrow-right text-gray-200 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all"></i>
-                        </button>
-                        
-                        <!-- Apple -->
-                        <button onclick="handleSocialLogin('apple')" class="group w-full flex items-center justify-between px-8 bg-black py-4.5 rounded-2xl font-black text-white hover:bg-gray-900 transition-all active:scale-[0.98] shadow-sm">
-                            <i class="fab fa-apple text-2xl"></i>
-                            <span>Apple로 계속하기</span>
-                            <i class="fas fa-arrow-right text-white/20 group-hover:text-white group-hover:translate-x-1 transition-all"></i>
+                        <!-- Google ONLY -->
+                        <button onclick="handleSocialLogin('google')" class="group w-full flex items-center justify-between px-10 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 py-5 rounded-[2rem] font-black text-gray-800 dark:text-white hover:border-indigo-500 dark:hover:border-indigo-400 transition-all active:scale-[0.98] shadow-xl shadow-gray-200/50 dark:shadow-none">
+                            <div class="flex items-center gap-4">
+                                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-8 h-8" alt="Google">
+                                <span class="text-xl tracking-tight">Google로 계속하기</span>
+                            </div>
+                            <i class="fas fa-arrow-right text-gray-200 group-hover:text-indigo-500 group-hover:translate-x-2 transition-all text-xl"></i>
                         </button>
                     </div>
 
