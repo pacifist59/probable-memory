@@ -288,20 +288,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 venue: f.get('venue'), 
                 location: f.get('location'),
                 songs: f.get('songs_text').split('\n').map(s => s.trim().replace(/^\d+\.\s*/, '')).filter(s => s),
-                user_id: session.user.id
+                user_id: session.user.id // DB에 user_id 컬럼이 생성되어 있어야 합니다.
             };
 
             const btn = e.target.querySelector('button[type="submit"]');
             btn.disabled = true; btn.innerText = '등록 중...';
 
             const { error } = await sb.from('setlists').insert([d]);
-            if (error) throw error;
             
-            alert('등록되었습니다!');
+            if (error) {
+                // If user_id column is missing, try inserting without it (as fallback)
+                if (error.message.includes('user_id')) {
+                    console.warn('user_id column missing, retrying without it...');
+                    delete d.user_id;
+                    const { error: retryError } = await sb.from('setlists').insert([d]);
+                    if (retryError) throw retryError;
+                } else {
+                    throw error;
+                }
+            }
+            
+            alert('성공적으로 등록되었습니다!');
             window.toggleModal(false);
             e.target.reset();
             fetchAndRenderSetlists();
-        } catch (err) { alert('등록 실패: ' + err.message); } 
+        } catch (err) { 
+            alert('등록 실패: ' + err.message + '\n(Supabase SQL Editor에서 user_id 컬럼 추가 명령어를 실행했는지 확인해주세요)'); 
+        }
         finally { 
             const btn = e.target.querySelector('button[type="submit"]');
             if (btn) { btn.disabled = false; btn.innerText = '등록하기'; }
