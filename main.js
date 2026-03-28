@@ -9,7 +9,10 @@ let isEditMode = false;
 // Modal handling
 window.toggleModal = (show) => {
     const m = document.getElementById('add-modal');
-    if (m) { m.classList.toggle('hidden', !show); document.body.style.overflow = show ? 'hidden' : 'auto'; }
+    if (m) { 
+        m.classList.toggle('hidden', !show); 
+        document.body.style.overflow = show ? 'hidden' : 'auto'; 
+    }
 }
 window.toggleAuthModal = (show) => {
     const m = document.getElementById('auth-modal');
@@ -28,14 +31,14 @@ async function updateAuthUI() {
     if (!container) return;
 
     if (session) {
-        const name = session.user.user_metadata?.full_name || session.user.email.split('@')[0];
+        const name = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email.split('@')[0];
         container.innerHTML = `
             <div class="flex items-center gap-4">
-                <div class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1 pr-4 rounded-2xl border border-gray-200 dark:border-gray-700">
-                    <img src="${session.user.user_metadata?.avatar_url || 'https://ui-avatars.com/api/?name='+name}" class="w-8 h-8 rounded-xl shadow-sm" alt="p">
+                <div class="flex items-center gap-3 bg-gray-100 dark:bg-gray-800 pl-2 pr-4 py-1.5 rounded-2xl border border-gray-200 dark:border-gray-700">
+                    <img src="${session.user.user_metadata?.avatar_url || 'https://ui-avatars.com/api/?name='+name}" class="w-8 h-8 rounded-xl shadow-sm" alt="profile">
                     <span class="text-sm font-black text-gray-700 dark:text-gray-200 hidden lg:inline">${name}</span>
                 </div>
-                <button id="logout-btn" class="text-xs font-black text-gray-400 hover:text-red-500 transition-colors">로그아웃</button>
+                <button id="logout-btn" class="text-sm font-black text-gray-500 hover:text-red-500 transition-colors">로그아웃</button>
             </div>
         `;
         document.getElementById('logout-btn')?.addEventListener('click', async () => { await sb.auth.signOut(); updateAuthUI(); });
@@ -45,25 +48,26 @@ async function updateAuthUI() {
 }
 
 window.handleSocialLogin = async (provider) => {
-    // Determine the current URL to ensure Supabase redirects back here
     const redirectUrl = window.location.origin;
-    
     try {
         const { error } = await sb.auth.signInWithOAuth({
             provider: provider,
-            options: {
-                redirectTo: redirectUrl
-            }
+            options: { redirectTo: redirectUrl }
         });
         if (error) throw error;
     } catch (err) {
         alert(`${provider} 로그인 중 오류가 발생했습니다: ${err.message}`);
     }
 }
+
 window.handleCheckAuthBeforeAdd = async () => {
     const { data: { session } } = await sb.auth.getSession();
-    if (!session) { alert('선곡표를 작성하려면 로그인이 필요합니다.'); toggleAuthModal(true); } 
-    else toggleModal(true);
+    if (!session) {
+        alert('선곡표를 작성하려면 로그인이 필요합니다.');
+        toggleAuthModal(true);
+    } else {
+        toggleModal(true);
+    }
 }
 
 // Render Functions
@@ -80,9 +84,12 @@ async function fetchAndRenderSetlists() {
     try {
         const { data, error } = await sb.from('setlists').select('*').order('created_at', { ascending: false });
         if (error) throw error;
-        if (!data?.length) { list.innerHTML = `<p class="text-center py-20 text-gray-400 font-bold">아직 등록된 선곡표가 없습니다.</p>`; return; }
+        if (!data?.length) { 
+            list.innerHTML = `<div class="text-center py-20 bg-white dark:bg-gray-900 rounded-[2.5rem] border-2 border-dashed border-gray-100 dark:border-gray-800"><p class="text-gray-400 font-bold text-xl">아직 등록된 선곡표가 없습니다.</p></div>`; 
+            return; 
+        }
         list.innerHTML = data.map(item => `
-            <div onclick="openDetail('${item.id}')" class="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-8 group hover:-translate-y-2">
+            <div onclick="openDetail('${item.id}')" class="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-8 group hover:-translate-y-2 relative overflow-hidden">
                 <div class="flex items-center space-x-8">
                     <div class="bg-indigo-50 dark:bg-indigo-900/20 w-20 h-20 rounded-[1.5rem] flex items-center justify-center text-indigo-600 dark:text-indigo-400 flex-shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500 shadow-inner">
                         <i class="fas fa-microphone-alt text-3xl"></i>
@@ -121,7 +128,8 @@ window.openDetail = async (id) => {
 async function renderDetailView(data) {
     const { data: { session } } = await sb.auth.getSession();
     const content = document.getElementById('detail-content');
-    
+    const canManage = session !== null;
+
     const songsHtml = data.songs?.length 
         ? data.songs.map((s, i) => `
             <div class="flex items-center gap-6 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
@@ -135,8 +143,11 @@ async function renderDetailView(data) {
         <div class="flex justify-between items-start mb-10">
             <button onclick="toggleDetailModal(false)" class="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors text-2xl"><i class="fas fa-arrow-left"></i></button>
             <div class="flex gap-3">
-                ${session ? `<button onclick="startEdit()" class="px-6 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl font-black text-sm hover:bg-indigo-600 hover:text-white transition-all">수정하기</button>` : ''}
-                <button onclick="alert('복사되었습니다!')" class="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all"><i class="fas fa-share-alt"></i></button>
+                ${canManage ? `
+                    <button onclick="startEdit()" class="px-6 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl font-black text-sm hover:bg-indigo-600 hover:text-white transition-all">수정하기</button>
+                    <button onclick="handleDelete('${data.id}')" class="w-10 h-10 bg-gray-100 dark:bg-red-900/20 text-gray-400 hover:text-white hover:bg-red-600 rounded-xl flex items-center justify-center transition-all"><i class="fas fa-trash-alt"></i></button>
+                ` : ''}
+                <button onclick="handleShare()" class="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all"><i class="fas fa-share-alt"></i></button>
             </div>
         </div>
         <div class="mb-12">
@@ -159,13 +170,29 @@ async function renderDetailView(data) {
     `;
 }
 
+window.handleDelete = async (id) => {
+    if (!confirm('정말로 이 선곡표를 삭제하시겠습니까?')) return;
+    try {
+        const { error } = await sb.from('setlists').delete().eq('id', id);
+        if (error) throw error;
+        alert('삭제되었습니다.');
+        toggleDetailModal(false);
+        fetchAndRenderSetlists();
+    } catch (err) { alert('삭제 실패: ' + err.message); }
+}
+
+window.handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    alert('주소가 복사되었습니다!');
+}
+
 window.startEdit = async () => {
     isEditMode = true;
     const { data } = await sb.from('setlists').select('*').eq('id', currentSetlistId).single();
     const content = document.getElementById('detail-content');
     content.innerHTML = `
         <div class="flex justify-between items-center mb-8">
-            <h3 class="text-3xl font-black dark:text-white">선곡표 수정 (Wiki)</h3>
+            <h3 class="text-3xl font-black dark:text-white">선곡표 수정</h3>
             <button onclick="openDetail('${currentSetlistId}')" class="text-gray-400 hover:text-white text-2xl"><i class="fas fa-times"></i></button>
         </div>
         <form id="edit-form" class="space-y-6">
@@ -184,7 +211,7 @@ window.startEdit = async () => {
                 <input type="text" name="concert" value="${data.concert}" required class="w-full px-5 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none">
             </div>
             <div class="space-y-1">
-                <label class="text-xs font-black text-gray-400 uppercase ml-1">곡 목록 (줄바꿈 구분)</label>
+                <label class="text-xs font-black text-gray-400 uppercase ml-1">곡 목록</label>
                 <textarea name="songs_text" rows="10" class="w-full px-5 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none resize-none font-medium">${data.songs?.join('\n') || ''}</textarea>
             </div>
             <div class="flex gap-4">
@@ -212,15 +239,36 @@ window.startEdit = async () => {
 document.addEventListener('DOMContentLoaded', () => {
     fetchAndRenderSetlists();
     updateAuthUI();
+    
     document.getElementById('setlist-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) return alert('로그인이 필요합니다.');
+
         const f = new FormData(e.target);
         const d = {
             artist: f.get('artist'), performance_date: f.get('performance_date'), concert: f.get('concert'),
             venue: f.get('venue'), location: f.get('location'),
             songs: f.get('songs_text').split('\n').map(s => s.trim().replace(/^\d+\.\s*/, '')).filter(s => s)
         };
-        const { error } = await sb.from('setlists').insert([d]);
-        if (error) alert('실패'); else { alert('등록성공!'); toggleModal(false); e.target.reset(); fetchAndRenderSetlists(); }
+
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.disabled = true; btn.innerText = '등록 중...';
+
+        try {
+            const { error } = await sb.from('setlists').insert([d]);
+            if (error) throw error;
+            alert('등록되었습니다!');
+            window.toggleModal(false);
+            e.target.reset();
+            fetchAndRenderSetlists();
+        } catch (err) { alert('실패: ' + err.message); }
+        finally { btn.disabled = false; btn.innerText = '등록하기'; }
     });
+
+    if (window.location.hash || window.location.search) {
+        sb.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN') { updateAuthUI(); fetchAndRenderSetlists(); }
+        });
+    }
 });
