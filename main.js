@@ -7,9 +7,21 @@ let allSetlists = [];
 let currentSetlistId = null;
 
 // Modal handling
-window.toggleModal = (s) => { document.getElementById('add-modal')?.classList.toggle('hidden', !s); document.body.style.overflow = s ? 'hidden' : 'auto'; }
-window.toggleAuthModal = (s) => { document.getElementById('auth-modal')?.classList.toggle('hidden', !s); document.body.style.overflow = s ? 'hidden' : 'auto'; }
-window.toggleDetailModal = (s) => { document.getElementById('detail-modal')?.classList.toggle('hidden', !s); document.body.style.overflow = s ? 'hidden' : 'auto'; }
+window.toggleModal = (s) => { 
+    const m = document.getElementById('add-modal');
+    if (m) m.classList.toggle('hidden', !s); 
+    document.body.style.overflow = s ? 'hidden' : 'auto'; 
+}
+window.toggleAuthModal = (s) => { 
+    const m = document.getElementById('auth-modal');
+    if (m) m.classList.toggle('hidden', !s); 
+    document.body.style.overflow = s ? 'hidden' : 'auto'; 
+}
+window.toggleDetailModal = (s) => { 
+    const m = document.getElementById('detail-modal');
+    if (m) m.classList.toggle('hidden', !s); 
+    document.body.style.overflow = s ? 'hidden' : 'auto'; 
+}
 
 // Auth UI
 async function updateAuthUI() {
@@ -18,18 +30,45 @@ async function updateAuthUI() {
     if (!container) return;
     if (session) {
         const name = session.user.user_metadata?.full_name || session.user.email.split('@')[0];
-        container.innerHTML = `<div class="flex items-center gap-4"><div class="flex items-center gap-3 bg-gray-100 dark:bg-gray-800 pl-2 pr-4 py-1.5 rounded-2xl border border-gray-200 dark:border-gray-700"><img src="${session.user.user_metadata?.avatar_url || 'https://ui-avatars.com/api/?name='+name}" class="w-8 h-8 rounded-xl shadow-sm"><span class="text-sm font-black text-gray-700 dark:text-gray-200 hidden lg:inline">${name}</span></div><button id="logout-btn" class="text-xs font-black text-gray-500 hover:text-red-500 transition-colors">로그아웃</button></div>`;
-        document.getElementById('logout-btn')?.addEventListener('click', async () => { await sb.auth.signOut(); updateAuthUI(); fetchAndRenderSetlists(); });
+        container.innerHTML = "` +
+            `<div class="flex items-center gap-4">
+                <div class="flex items-center gap-3 bg-gray-100 dark:bg-gray-800 pl-2 pr-4 py-1.5 rounded-2xl border border-gray-200 dark:border-gray-700">
+                    <img src="${session.user.user_metadata?.avatar_url || 'https://ui-avatars.com/api/?name='+name}" class="w-8 h-8 rounded-xl shadow-sm">
+                    <span class="text-sm font-black text-gray-700 dark:text-gray-200 hidden lg:inline">${name}</span>
+                </div>
+                <button id="logout-btn" class="text-xs font-black text-gray-500 hover:text-red-500 transition-colors">로그아웃</button>
+            </div>
+        ";
+        document.getElementById('logout-btn')?.addEventListener('click', async () => { 
+            await sb.auth.signOut(); 
+            updateAuthUI(); 
+            fetchAndRenderSetlists(); 
+        });
     } else {
         container.innerHTML = `<button onclick="toggleAuthModal(true)" class="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black hover:bg-indigo-700 transition-all shadow-lg active:scale-95">로그인</button>`;
     }
 }
 
-window.handleSocialLogin = async (p) => { try { await sb.auth.signInWithOAuth({ provider: p, options: { redirectTo: window.location.origin } }); } catch (e) { alert('설정이 필요합니다.'); } }
-window.handleCheckAuthBeforeAdd = async () => { const { data: { session } } = await sb.auth.getSession(); if (!session) { alert('로그인이 필요합니다.'); toggleAuthModal(true); } else toggleModal(true); }
+window.handleSocialLogin = async (p) => { 
+    try { 
+        await sb.auth.signInWithOAuth({ provider: p, options: { redirectTo: window.location.origin } }); 
+    } catch (e) { alert('설정이 필요합니다.'); } 
+}
+
+window.handleCheckAuthBeforeAdd = async () => { 
+    const { data: { session } } = await sb.auth.getSession(); 
+    if (!session) { alert('로그인이 필요합니다.'); toggleAuthModal(true); } 
+    else toggleModal(true); 
+}
 
 // Search
-window.handleSearch = (q) => { renderSetlistCards(allSetlists.filter(i => (i.artist||'').toLowerCase().includes(q.toLowerCase()) || (i.concert||'').toLowerCase().includes(q.toLowerCase()))); }
+window.handleSearch = (q) => { 
+    const filtered = allSetlists.filter(i => 
+        (i.artist||'').toLowerCase().includes(q.toLowerCase()) || 
+        (i.concert||'').toLowerCase().includes(q.toLowerCase())
+    );
+    renderSetlistCards(filtered); 
+}
 
 // Stats
 window.showStats = () => {
@@ -38,18 +77,21 @@ window.showStats = () => {
     allSetlists.forEach(s => artistCounts[s.artist] = (artistCounts[s.artist] || 0) + 1);
     const sorted = Object.entries(artistCounts).sort((a,b) => b[1] - a[1]);
     
-    list.innerHTML = `<div class="bg-white dark:bg-gray-900 p-10 rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-800 animate-fadeIn">
-        <h3 class="text-3xl font-black mb-8 dark:text-white flex items-center gap-3"><i class="fas fa-crown text-yellow-500"></i> 아티스트 랭킹</h3>
-        <div class="space-y-6">${sorted.map(([name, count], i) => `
-            <div class="flex items-center justify-between p-6 bg-gray-50 dark:bg-gray-800 rounded-[2rem] group hover:bg-indigo-600 transition-all">
-                <div class="flex items-center gap-6">
-                    <span class="text-3xl font-black ${i<3 ? 'text-indigo-500 group-hover:text-white' : 'text-gray-300'}">${i+1}</span>
-                    <span class="text-xl font-bold dark:text-white group-hover:text-white">${name}</span>
-                </div>
-                <span class="px-6 py-2 bg-white dark:bg-gray-700 rounded-full text-indigo-600 dark:text-indigo-400 font-black group-hover:text-indigo-600 shadow-sm">${count} 선곡표</span>
+    list.innerHTML = "` +
+        `<div class="bg-white dark:bg-gray-900 p-10 rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-800">
+            <h3 class="text-3xl font-black mb-8 dark:text-white flex items-center gap-3"><i class="fas fa-crown text-yellow-500"></i> 아티스트 랭킹</h3>
+            <div class="space-y-6">
+                ${sorted.map(([name, count], i) => `
+                    <div class="flex items-center justify-between p-6 bg-gray-50 dark:bg-gray-800 rounded-[2rem] group hover:bg-indigo-600 transition-all">
+                        <div class="flex items-center gap-6">
+                            <span class="text-3xl font-black ${i<3 ? 'text-indigo-500 group-hover:text-white' : 'text-gray-300'}">${i+1}</span>
+                            <span class="text-xl font-bold dark:text-white group-hover:text-white">${name}</span>
+                        </div>
+                        <span class="px-6 py-2 bg-white dark:bg-gray-700 rounded-full text-indigo-600 dark:text-indigo-400 font-black shadow-sm">${count} 선곡표</span>
+                    </div>
+                `).join('')}
             </div>
-        `).join('')}</div>
-    </div>`;
+        </div>`;
 }
 
 // Render Core
@@ -90,6 +132,9 @@ function renderSetlistCards(data) {
 window.openDetail = async (id) => {
     currentSetlistId = id;
     toggleDetailModal(true);
+    const content = document.getElementById('detail-content');
+    content.innerHTML = `<div class="animate-pulse space-y-6"><div class="h-8 bg-gray-100 dark:bg-gray-800 rounded-xl w-1/3"></div><div class="h-40 bg-gray-100 dark:bg-gray-800 rounded-3xl w-full"></div></div>`;
+    
     const { data } = await sb.from('setlists').select('*').eq('id', id).single();
     const { count: likeCount } = await sb.from('likes').select('*', { count: 'exact', head: true }).eq('setlist_id', id);
     const { data: comments } = await sb.from('comments').select('*').eq('setlist_id', id).order('created_at', { ascending: true });
@@ -101,8 +146,12 @@ async function renderDetailView(data, likeCount, comments) {
     const { data: { session } } = await sb.auth.getSession();
     const content = document.getElementById('detail-content');
     
-    content.innerHTML = `
-        <div class="flex justify-between items-start mb-10">
+    const songsHtml = data.songs?.length 
+        ? data.songs.map((s, i) => `<div class="flex items-center gap-6 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group"><span class="text-2xl font-black text-indigo-200 dark:text-gray-700 group-hover:text-indigo-500">${String(i + 1).padStart(2, '0')}</span><span class="text-lg font-bold dark:text-gray-200">${s}</span></div>`).join('')
+        : `<p class="text-gray-400 font-bold py-10 text-center">곡 목록이 없습니다.</p>`;
+
+    content.innerHTML = "` +
+        `<div class="flex justify-between items-start mb-10">
             <button onclick="toggleDetailModal(false)" class="text-gray-400 hover:text-white transition-colors text-2xl"><i class="fas fa-arrow-left"></i></button>
             <div class="flex gap-3">
                 <button onclick="handleLike('${data.id}')" class="flex items-center gap-2 px-6 py-2 bg-pink-50 dark:bg-pink-900/20 text-pink-500 rounded-xl font-black text-sm hover:bg-pink-500 hover:text-white transition-all"><i class="fas fa-heart"></i> ${likeCount}</button>
@@ -122,7 +171,7 @@ async function renderDetailView(data, likeCount, comments) {
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
             <div>
                 <h3 class="text-xl font-black dark:text-white uppercase tracking-widest text-indigo-500 mb-6">SETLIST</h3>
-                <div class="space-y-1">${data.songs?.map((s, i) => `<div class="flex items-center gap-6 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group"><span class="text-2xl font-black text-indigo-200 dark:text-gray-700 group-hover:text-indigo-500">${String(i + 1).padStart(2, '0')}</span><span class="text-lg font-bold dark:text-gray-200">${s}</span></div>`).join('')}</div>
+                <div class="space-y-1">${songsHtml}</div>
             </div>
             <div>
                 <h3 class="text-xl font-black dark:text-white uppercase tracking-widest text-purple-500 mb-6">COMMENTS</h3>
@@ -150,20 +199,56 @@ window.postComment = async (id) => {
     input.value = ''; openDetail(id);
 }
 
-// Registration with Image
+window.handleDelete = async (id) => {
+    if (!confirm('정말로 삭제하시겠습니까?')) return;
+    await sb.from('setlists').delete().match({ id });
+    toggleDetailModal(false); fetchAndRenderSetlists();
+}
+
+window.startEdit = async () => {
+    const { data } = await sb.from('setlists').select('*').eq('id', currentSetlistId).single();
+    const content = document.getElementById('detail-content');
+    content.innerHTML = "` +
+        `<h3 class="text-3xl font-black mb-8 dark:text-white">선곡표 수정</h3>
+        <form id="edit-form" class="space-y-6">
+            <input type="text" name="artist" value="${data.artist}" required class="w-full px-5 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white">
+            <input type="date" name="performance_date" value="${data.performance_date}" required class="w-full px-5 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white">
+            <input type="text" name="concert" value="${data.concert}" required class="w-full px-5 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white">
+            <textarea name="songs_text" rows="10" class="w-full px-5 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white resize-none font-medium">${data.songs?.join('\n') || ''}</textarea>
+            <div class="flex gap-4">
+                <button type="submit" class="flex-1 bg-indigo-600 text-white py-5 rounded-2xl font-black">수정 완료</button>
+                <button type="button" onclick="openDetail('${currentSetlistId}')" class="px-8 bg-gray-100 dark:bg-gray-800 dark:text-white py-5 rounded-2xl font-black">취소</button>
+            </div>
+        </form>
+    ";
+    document.getElementById('edit-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.target);
+        await sb.from('setlists').update({
+            artist: f.get('artist'), performance_date: f.get('performance_date'), concert: f.get('concert'),
+            songs: f.get('songs_text').split('\n').map(s => s.trim()).filter(s => s)
+        }).eq('id', currentSetlistId);
+        openDetail(currentSetlistId); fetchAndRenderSetlists();
+    };
+}
+
+// Registration
 document.addEventListener('DOMContentLoaded', () => {
     fetchAndRenderSetlists(); updateAuthUI();
     document.getElementById('setlist-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const { data: { session } } = await sb.auth.getSession();
+        if (!session) return alert('로그인이 필요합니다.');
+        
         const f = new FormData(e.target);
-        const imgFile = document.getElementById('image-upload').files[0];
+        const imgInput = document.getElementById('image-upload');
         let imageUrl = null;
 
-        if (imgFile) {
-            const fileName = `${Date.now()}_${imgFile.name}`;
-            const { data: imgData } = await sb.storage.from('posters').upload(fileName, imgFile);
-            if (imgData) imageUrl = sb.storage.from('posters').getPublicUrl(fileName).data.publicUrl;
+        if (imgInput && imgInput.files && imgInput.files[0]) {
+            const file = imgInput.files[0];
+            const fileName = `${Date.now()}_${file.name}`;
+            const { data: uploadData, error: uploadError } = await sb.storage.from('posters').upload(fileName, file);
+            if (!uploadError) imageUrl = sb.storage.from('posters').getPublicUrl(fileName).data.publicUrl;
         }
 
         const d = {
