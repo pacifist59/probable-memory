@@ -1,7 +1,20 @@
 // Supabase configuration
 const SUPABASE_URL = 'https://yyjghcsnomwvqwpaojug.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5amdoY3Nub213dnF3cGFvanVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2NzQzNzAsImV4cCI6MjA5MDI1MDM3MH0.HANV95lxI1XgXTALkqXDbe_-U2-_yB2xJD4Zsb-pqf0';
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Modal handling (Global scope for onclick)
+window.toggleModal = function(show) {
+    const modal = document.getElementById('add-modal');
+    if (!modal) return;
+    if (show) {
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    } else {
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+}
 
 // Function to format date relative to now
 function getRelativeTime(dateString) {
@@ -29,7 +42,7 @@ async function fetchAndRenderSetlists() {
     `;
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await _supabase
             .from('setlists')
             .select('*')
             .order('created_at', { ascending: false });
@@ -73,17 +86,46 @@ async function fetchAndRenderSetlists() {
     }
 }
 
-// Modal handling
-function toggleModal(show) {
-    const modal = document.getElementById('add-modal');
-    if (show) {
-        modal.classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-    } else {
-        modal.classList.add('hidden');
-        document.body.style.overflow = 'auto';
-    }
-}
+// Form Submission
+document.addEventListener('DOMContentLoaded', () => {
+    fetchAndRenderSetlists();
+
+    document.getElementById('setlist-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const setlistData = {
+            artist: formData.get('artist'),
+            performance_date: formData.get('performance_date'),
+            concert: formData.get('concert'),
+            venue: formData.get('venue'),
+            location: formData.get('location'),
+            songs: [] // Initially empty
+        };
+
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerText = '등록 중...';
+
+        try {
+            const { error } = await _supabase
+                .from('setlists')
+                .insert([setlistData]);
+
+            if (error) throw error;
+
+            alert('성공적으로 등록되었습니다!');
+            window.toggleModal(false);
+            e.target.reset();
+            fetchAndRenderSetlists(); // Refresh list
+        } catch (err) {
+            console.error('Error inserting setlist:', err);
+            alert('등록 실패: ' + err.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerText = '등록하기';
+        }
+    });
+});
 
 // Form Submission
 document.getElementById('setlist-form')?.addEventListener('submit', async (e) => {
