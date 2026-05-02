@@ -69,11 +69,24 @@ async function renderHomePage() {
     loadTrendingArtists();
 }
 
-async function renderSetlistsPage() {
-    const { data } = await sb.from('setlists').select('*').order('performance_date', { ascending: false });
+async function renderSetlistsPage(filter = null) {
+    let query = sb.from('setlists').select('*').order('performance_date', { ascending: false });
+    
+    let title = '모든 선곡표';
+    if (filter) {
+        const [type, value] = filter.split(':');
+        if (type === 'artist') { query = query.eq('artist', value); title = `${value} 선곡표`; }
+        else if (type === 'venue') { query = query.eq('venue', value); title = `${value} 공연 기록`; }
+        else if (type === 'category') { query = query.eq('category', value); title = value === 'Festival' ? '페스티벌 기록' : title; }
+    }
+
+    const { data } = await query;
     const routerContainer = document.getElementById('page-router');
     routerContainer.innerHTML = `
-        <h2 class="text-4xl font-black mb-12 dark:text-white">모든 선곡표</h2>
+        <div class="flex items-center gap-4 mb-12">
+            ${filter ? `<button onclick="window.history.back()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-indigo-600 transition-all"><i class="fas fa-arrow-left text-sm"></i></button>` : ''}
+            <h2 class="text-4xl font-black dark:text-white">${title}</h2>
+        </div>
         <div class="space-y-6" id="all-setlists-list"></div>
     `;
     renderSetlistCards(data || [], 'all-setlists-list');
@@ -81,24 +94,78 @@ async function renderSetlistsPage() {
 
 async function renderArtistsPage() {
     const { data } = await sb.from('setlists').select('artist');
-    const artists = [...new Set(data.map(d => d.artist))].sort();
+    const counts = {};
+    data.forEach(d => counts[d.artist] = (counts[d.artist] || 0) + 1);
+    const artists = Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0]));
+    
     const routerContainer = document.getElementById('page-router');
     routerContainer.innerHTML = `
-        <h2 class="text-4xl font-black mb-12 dark:text-white">아티스트 목록</h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            ${artists.map(a => `<div class="p-6 bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-800 font-bold text-center hover:border-indigo-500 cursor-pointer transition-all">${a}</div>`).join('')}
+        <h2 class="text-4xl font-black mb-12 dark:text-white text-center md:text-left">아티스트 목록</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            ${artists.map(([name, count]) => `
+                <div onclick="navigateTo('setlists', 'artist:${name}')" class="p-8 bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:border-indigo-500 cursor-pointer transition-all group text-center">
+                    <div class="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mx-auto mb-4 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                        <i class="fas fa-user-astronaut text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-black dark:text-white mb-1 group-hover:text-indigo-600 transition-colors">${name}</h3>
+                    <p class="text-sm text-gray-400 font-bold">${count}개의 선곡표</p>
+                </div>
+            `).join('')}
         </div>
     `;
 }
 
 async function renderFestivalsPage() {
+    const { data } = await sb.from('setlists').select('*').eq('category', 'Festival').order('performance_date', { ascending: false });
+    const festivals = [...new Set(data.map(d => d.concert))].sort();
+    
     const routerContainer = document.getElementById('page-router');
-    routerContainer.innerHTML = `<div class="text-center py-20 text-gray-400 font-bold text-2xl">페스티벌 페이지 준비 중입니다.</div>`;
+    routerContainer.innerHTML = `
+        <h2 class="text-4xl font-black mb-12 dark:text-white">페스티벌 아카이브</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            ${festivals.map(name => `
+                <div onclick="navigateTo('setlists', 'category:Festival')" class="p-8 bg-gradient-to-br from-purple-500/10 to-indigo-600/10 dark:from-purple-500/5 dark:to-indigo-600/5 rounded-[2.5rem] border border-indigo-100 dark:border-indigo-900/30 hover:border-indigo-500 cursor-pointer transition-all group">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-2xl font-black dark:text-white group-hover:text-indigo-600 transition-colors">${name}</h3>
+                            <p class="text-indigo-400 font-bold mt-1 uppercase tracking-widest text-xs">Festival Edition</p>
+                        </div>
+                        <i class="fas fa-republican text-3xl text-indigo-200 dark:text-indigo-800"></i>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+        ${festivals.length === 0 ? `<p class="text-center py-20 text-gray-400 font-bold">등록된 페스티벌이 없습니다.</p>` : ''}
+    `;
 }
 
 async function renderVenuesPage() {
+    const { data } = await sb.from('setlists').select('venue, location');
+    const uniqueVenues = [];
+    const seen = new Set();
+    data.forEach(d => {
+        if (d.venue && !seen.has(d.venue)) {
+            seen.add(d.venue);
+            uniqueVenues.push(d);
+        }
+    });
+    
     const routerContainer = document.getElementById('page-router');
-    routerContainer.innerHTML = `<div class="text-center py-20 text-gray-400 font-bold text-2xl">공연장 페이지 준비 중입니다.</div>`;
+    routerContainer.innerHTML = `
+        <h2 class="text-4xl font-black mb-12 dark:text-white">공연장 정보</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            ${uniqueVenues.map(v => `
+                <div onclick="navigateTo('setlists', 'venue:${v.venue}')" class="p-8 bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:border-indigo-500 cursor-pointer transition-all group">
+                    <div class="w-12 h-12 bg-gray-50 dark:bg-gray-800 rounded-xl flex items-center justify-center text-gray-400 group-hover:bg-indigo-600 group-hover:text-white transition-all mb-4">
+                        <i class="fas fa-map-marked-alt text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-black dark:text-white mb-1 group-hover:text-indigo-600 transition-colors">${v.venue}</h3>
+                    <p class="text-sm text-gray-400 font-medium">${v.location || ''}</p>
+                </div>
+            `).join('')}
+        </div>
+        ${uniqueVenues.length === 0 ? `<p class="text-center py-20 text-gray-400 font-bold">등록된 공연장이 없습니다.</p>` : ''}
+    `;
 }
 
 async function renderStatsPage() {
