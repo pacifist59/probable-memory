@@ -4,6 +4,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let allSetlists = []; 
+let editingId = null;
 
 // --- Global UI Handlers ---
 window.toggleMobileMenu = (s = null) => {
@@ -35,6 +36,20 @@ window.navigateTo = (page, id = null) => {
 window.toggleTheme = () => {
     const isDark = document.documentElement.classList.toggle('dark');
     localStorage.theme = isDark ? 'dark' : 'light';
+}
+
+window.toggleModal = (s) => { 
+    const modal = document.getElementById('add-modal');
+    if (!modal) return;
+    modal.classList.toggle('hidden', !s);
+    if (!s) {
+        editingId = null;
+        document.getElementById('setlist-form')?.reset();
+        const title = modal.querySelector('h3');
+        const btn = modal.querySelector('button[type="submit"]');
+        if (title) title.innerText = '새 선곡표 등록';
+        if (btn) btn.innerText = '등록하기';
+    }
 }
 
 // --- Routing System ---
@@ -256,6 +271,7 @@ async function renderDetailView(data, likeCount, comments, targetId) {
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
             <div class="lg:col-span-8 bg-white dark:bg-gray-900 p-10 rounded-[3rem] border dark:border-gray-800 shadow-sm">${setsHtml || '등록된 곡이 없습니다.'}</div>
             <div class="lg:col-span-4 space-y-10">
+                ${data.image_url ? `<div class="bg-white dark:bg-gray-900 p-4 rounded-[3rem] border dark:border-gray-800 shadow-sm overflow-hidden"><img src="${data.image_url}" class="w-full h-auto rounded-[2.5rem] object-cover" alt="공연 포스터"></div>` : ''}
                 <div>
                     <h3 class="text-xl font-black mb-8">팬 후기</h3>
                     <div class="space-y-4 mb-8">${comments.map(c => `<div class="p-6 bg-gray-50 dark:bg-gray-800 rounded-[1.5rem] border dark:border-gray-800"><p class="text-xs font-black text-indigo-500 mb-2">${c.display_name || '익명'}</p><p class="text-sm font-medium leading-relaxed">${c.content}</p></div>`).join('')}</div>
@@ -310,7 +326,9 @@ function renderSetlistCards(data, targetId, isUpcoming = false) {
     list.innerHTML = data.map(item => `
         <div onclick="window.navigateTo('setlist', '${item.id}')" class="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-2xl transition-all cursor-pointer flex justify-between items-center group">
             <div class="flex items-center gap-8">
-                <div class="w-20 h-20 bg-indigo-50 dark:bg-gray-800 rounded-3xl flex items-center justify-center text-indigo-600 text-3xl group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner"><i class="fas fa-microphone-alt"></i></div>
+                <div class="w-20 h-20 bg-indigo-50 dark:bg-gray-800 rounded-3xl flex items-center justify-center text-indigo-600 text-3xl group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner overflow-hidden">
+                    ${item.image_url ? `<img src="${item.image_url}" class="w-full h-full object-cover">` : '<i class="fas fa-microphone-alt"></i>'}
+                </div>
                 <div>
                     <h3 class="font-black text-3xl tracking-tighter dark:text-white group-hover:text-indigo-600 transition-colors">${item.artist}</h3>
                     <p class="text-xl font-bold text-gray-400">${item.concert}</p>
@@ -318,7 +336,7 @@ function renderSetlistCards(data, targetId, isUpcoming = false) {
             </div>
             <div class="text-right hidden sm:block">
                 <p class="font-black text-2xl dark:text-gray-200">${item.performance_date}</p>
-                <p class="text-sm font-black text-gray-300 uppercase tracking-widest">${isUpcoming ? 'Upcoming' : item.venue}</p>
+                <p class="text-sm font-black text-gray-300 uppercase tracking-widest">${isUpcoming ? 'Upcoming' : (item.venue || '')}</p>
             </div>
         </div>`).join('');
 }
@@ -395,18 +413,26 @@ document.addEventListener('DOMContentLoaded', () => {
             venue: f.get('venue'), 
             location: f.get('location'), 
             category: f.get('category'),
-            image_url: imageUrl,
             songs: f.get('songs_text').split('\n').map(s => s.trim()).filter(s => s), 
             user_id: session.user.id 
         };
+        if (imageUrl) d.image_url = imageUrl;
         
-        const { data: ins, error: insErr } = await sb.from('setlists').insert([d]).select();
-        if (insErr) {
-            console.error('Insert error:', insErr);
-            alert('등록 중 오류가 발생했습니다.');
+        let result;
+        if (editingId) {
+            result = await sb.from('setlists').update(d).eq('id', editingId).select();
+        } else {
+            result = await sb.from('setlists').insert([d]).select();
+        }
+
+        const { data: resData, error: resErr } = result;
+        if (resErr) {
+            console.error('Submit error:', resErr);
+            alert('저장 중 오류가 발생했습니다.');
         } else {
             window.toggleModal(false); 
-            if (ins?.[0]) window.navigateTo('setlist', ins[0].id);
+            if (resData?.[0]) window.navigateTo('setlist', resData[0].id);
+            else if (editingId) renderSetlistDetailPage(editingId);
         }
     });
 });
@@ -414,5 +440,30 @@ document.addEventListener('DOMContentLoaded', () => {
 window.handleSocialLogin = async (p) => { await sb.auth.signInWithOAuth({ provider: p, options: { redirectTo: window.location.origin } }); }
 window.toggleAuthModal = (s) => { document.getElementById('auth-modal').classList.toggle('hidden', !s); }
 window.toggleModal = (s) => { document.getElementById('add-modal').classList.toggle('hidden', !s); }
+window.startEdit = async (id) => {
+    const { data, error } = await sb.from('setlists').select('*').eq('id', id).single();
+    if (error || !data) return alert('데이터를 불러올 수 없습니다.');
+    
+    editingId = id;
+    const f = document.getElementById('setlist-form');
+    if (!f) return;
+    
+    f.artist.value = data.artist || '';
+    f.category.value = data.category || 'Concert';
+    f.performance_date.value = data.performance_date || '';
+    f.concert.value = data.concert || '';
+    f.venue.value = data.venue || '';
+    f.location.value = data.location || '';
+    f.songs_text.value = data.songs ? data.songs.join('\n') : '';
+    
+    const modal = document.getElementById('add-modal');
+    const title = modal.querySelector('h3');
+    const btn = modal.querySelector('button[type="submit"]');
+    if (title) title.innerText = '선곡표 수정';
+    if (btn) btn.innerText = '수정 완료';
+    
+    window.toggleModal(true);
+}
+
 window.handleCheckAuthBeforeAdd = async () => { const { data: { session } } = await sb.auth.getSession(); if (!session) window.toggleAuthModal(true); else window.toggleModal(true); }
 window.handleLike = async (id) => { const { data: { session } } = await sb.auth.getSession(); if (!session) return window.toggleAuthModal(true); await sb.from('likes').insert({ setlist_id: id, user_id: session.user.id }); renderSetlistDetailPage(id); }
