@@ -296,7 +296,6 @@ async function renderDetailView(data, likeCount, comments) {
         </div>
     `;
 }
-}
 
 window.handleLike = async (id) => {
     const { data: { session } } = await sb.auth.getSession();
