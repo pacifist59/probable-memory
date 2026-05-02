@@ -369,11 +369,45 @@ async function renderMyAttendancePage() {
 document.addEventListener('DOMContentLoaded', () => {
     updateAuthUI(); handleRouting();
     document.getElementById('setlist-form')?.addEventListener('submit', async (e) => {
-        e.preventDefault(); const { data: { session } } = await sb.auth.getSession(); if (!session) return;
+        e.preventDefault();
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) return alert('로그인이 필요합니다.');
+        
         const f = new FormData(e.target);
-        const d = { artist: f.get('artist'), performance_date: f.get('performance_date'), concert: f.get('concert'), venue: f.get('venue'), location: f.get('location'), songs: f.get('songs_text').split('\n').map(s => s.trim()).filter(s => s), user_id: session.user.id };
-        const { data: ins } = await sb.from('setlists').insert([d]).select();
-        window.toggleModal(false); if (ins?.[0]) window.navigateTo('setlist', ins[0].id);
+        const imgInput = document.getElementById('image-upload');
+        let imageUrl = null;
+
+        if (imgInput?.files?.[0]) {
+            const file = imgInput.files[0];
+            const fileName = `${Date.now()}_${file.name}`;
+            const { data: up, error: err } = await sb.storage.from('posters').upload(fileName, file);
+            if (!err) {
+                imageUrl = sb.storage.from('posters').getPublicUrl(fileName).data.publicUrl;
+            } else {
+                console.error('Upload error:', err);
+            }
+        }
+
+        const d = { 
+            artist: f.get('artist'), 
+            performance_date: f.get('performance_date'), 
+            concert: f.get('concert'), 
+            venue: f.get('venue'), 
+            location: f.get('location'), 
+            category: f.get('category'),
+            image_url: imageUrl,
+            songs: f.get('songs_text').split('\n').map(s => s.trim()).filter(s => s), 
+            user_id: session.user.id 
+        };
+        
+        const { data: ins, error: insErr } = await sb.from('setlists').insert([d]).select();
+        if (insErr) {
+            console.error('Insert error:', insErr);
+            alert('등록 중 오류가 발생했습니다.');
+        } else {
+            window.toggleModal(false); 
+            if (ins?.[0]) window.navigateTo('setlist', ins[0].id);
+        }
     });
 });
 
