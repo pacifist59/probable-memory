@@ -312,7 +312,7 @@ async function renderDetailView(data, likeCount, comments, targetId) {
                             <div class="flex items-center gap-3 flex-wrap">
                                 <span class="text-lg font-bold dark:text-gray-200">${s.title}</span>
                                 ${s.cover ? `<span class="text-sm text-gray-400 italic font-medium">(${s.cover} 커버)</span>` : ''}
-                                <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(data.artist + ' ' + s.title + ' Official Music Video')}" target="_blank" class="text-red-500 hover:text-red-600 transition-colors text-lg opacity-0 group-hover:opacity-100"><i class="fab fa-youtube"></i></a>
+                                <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(data.artist + ' ' + s.title + ' Official')}&search_type=videos" target="_blank" class="text-red-500 hover:text-red-600 transition-colors text-lg opacity-0 group-hover:opacity-100"><i class="fab fa-youtube"></i></a>
                             </div>
                             ${s.note ? `<p class="text-xs text-indigo-400 font-bold mt-1"><i class="fas fa-info-circle mr-1"></i>${s.note}</p>` : ''}
                         </div>
