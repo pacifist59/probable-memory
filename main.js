@@ -4,7 +4,6 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let allSetlists = []; 
-let currentSetlistId = null;
 
 // --- Routing System ---
 const routes = {
@@ -14,23 +13,34 @@ const routes = {
     festivals: renderFestivalsPage,
     venues: renderVenuesPage,
     stats: renderStatsPage,
-    setlist: renderSetlistDetailPage
+    setlist: renderSetlistDetailPage,
+    profile: renderProfilePage,
+    myattended: renderMyAttendancePage
 };
 
 function navigateTo(page, id = null) {
     const hash = id ? `#/${page}/${id}` : `#/${page}`;
-    window.location.hash = hash;
+    if (window.location.hash === hash) handleRouting(); // Force reload if same hash
+    else window.location.hash = hash;
 }
 
 window.addEventListener('hashchange', handleRouting);
 
 async function handleRouting() {
     const hash = window.location.hash || '#/home';
-    const [_, page, id] = hash.split('/');
-    
+    const parts = hash.split('/');
+    const page = parts[1] || 'home';
+    const id = parts.slice(2).join('/'); // Support IDs with colons like 'artist:Name'
+
+    console.log('Routing to:', page, 'ID:', id);
+
     // UI Cleanup
-    document.getElementById('home-hero').style.display = page === 'home' ? 'block' : 'none';
+    const hero = document.getElementById('home-hero');
+    if (hero) hero.style.display = page === 'home' ? 'block' : 'none';
+    
     const routerContainer = document.getElementById('page-router');
+    if (!routerContainer) return;
+    
     routerContainer.innerHTML = `<div class="flex justify-center py-20"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>`;
 
     if (routes[page]) {
@@ -44,7 +54,7 @@ async function handleRouting() {
 // --- Page Renderers ---
 
 async function renderHomePage() {
-    const { data } = await sb.from('setlists').select('*').order('created_at', { ascending: false }).limit(5);
+    const { data } = await sb.from('setlists').select('*').order('performance_date', { ascending: false }).limit(5);
     allSetlists = data || [];
     
     const routerContainer = document.getElementById('page-router');
@@ -74,10 +84,14 @@ async function renderSetlistsPage(filter = null) {
     
     let title = '모든 선곡표';
     if (filter) {
-        const [type, value] = filter.split(':');
+        const decoded = decodeURIComponent(filter);
+        const parts = decoded.split(':');
+        const type = parts[0];
+        const value = parts.slice(1).join(':');
+
         if (type === 'artist') { query = query.eq('artist', value); title = `${value} 선곡표`; }
         else if (type === 'venue') { query = query.eq('venue', value); title = `${value} 공연 기록`; }
-        else if (type === 'category') { query = query.eq('category', value); title = value === 'Festival' ? '페스티벌 기록' : title; }
+        else if (type === 'category') { query = query.eq('category', value); title = value === 'Festival' ? '페스티벌 아카이브' : title; }
     }
 
     const { data } = await query;
@@ -204,6 +218,58 @@ async function renderSetlistDetailPage(id) {
     renderDetailView(data, likeCount || 0, comments || [], 'detail-full-view');
 }
 
+async function renderProfilePage() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return navigateTo('home');
+    
+    const nickname = session.user.user_metadata?.display_name || session.user.email.split('@')[0];
+    
+    const routerContainer = document.getElementById('page-router');
+    routerContainer.innerHTML = `
+        <div class="max-w-2xl mx-auto bg-white dark:bg-gray-900 p-10 rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-800">
+            <h2 class="text-4xl font-black mb-8 dark:text-white text-center">개인 정보 설정</h2>
+            <form id="profile-form" class="space-y-6">
+                <div>
+                    <label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">이메일 계정</label>
+                    <input type="text" value="${session.user.email}" disabled class="w-full px-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-800 text-gray-400 border-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">활동 닉네임</label>
+                    <input type="text" id="profile-nickname" value="${nickname}" required class="w-full px-6 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none transition-all">
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-xl hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-500/20">저장하기</button>
+            </form>
+        </div>
+    `;
+    
+    document.getElementById('profile-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const newNickname = document.getElementById('profile-nickname').value;
+        const { error } = await sb.auth.updateUser({ data: { display_name: newNickname } });
+        if (error) alert('수정 중 오류가 발생했습니다.');
+        else { alert('닉네임이 성공적으로 변경되었습니다!'); updateAuthUI(); }
+    };
+}
+
+async function renderMyAttendancePage() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return navigateTo('home');
+    
+    // We use 'likes' table as a proxy for 'attendance' for now
+    const { data: attended } = await sb.from('likes').select('setlist_id').eq('user_id', session.user.id);
+    const setlistIds = attended.map(a => a.setlist_id);
+    
+    const { data: setlists } = await sb.from('setlists').select('*').in('id', setlistIds).order('performance_date', { ascending: false });
+    
+    const routerContainer = document.getElementById('page-router');
+    routerContainer.innerHTML = `
+        <h2 class="text-4xl font-black mb-12 dark:text-white">내가 다녀온 공연</h2>
+        <div class="space-y-6" id="my-attended-list"></div>
+        ${setlists?.length === 0 ? `<div class="text-center py-20 text-gray-400 font-bold">아직 관람 완료로 표시한 공연이 없습니다.</div>` : ''}
+    `;
+    renderSetlistCards(setlists || [], 'my-attended-list');
+}
+
 // --- Component Renderers ---
 
 function renderSetlistCards(data, targetId) {
@@ -241,7 +307,7 @@ async function loadTrendingArtists() {
     const container = document.getElementById('trending-artists');
     if (container) {
         container.innerHTML = sorted.map(([name, count], i) => `
-            <li class="flex items-center justify-between group cursor-pointer" onclick="handleSearch('${name}')">
+            <li class="flex items-center justify-between group cursor-pointer" onclick="navigateTo('setlists', 'artist:${name}')">
                 <div class="flex items-center gap-4">
                     <div class="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-gray-800 flex items-center justify-center text-indigo-500 font-bold group-hover:bg-indigo-500 group-hover:text-white transition-all">${i+1}</div>
                     <span class="font-bold text-gray-800 dark:text-gray-200 text-lg group-hover:text-indigo-600 transition-colors">${name}</span>
@@ -252,7 +318,7 @@ async function loadTrendingArtists() {
     }
 }
 
-// --- Detail View Renderer (Updated with Youtube Link) ---
+// --- Detail View Renderer ---
 
 async function renderDetailView(data, likeCount, comments, targetId) {
     const { data: { session } } = await sb.auth.getSession();
@@ -294,7 +360,7 @@ async function renderDetailView(data, likeCount, comments, targetId) {
                             <div class="flex items-center gap-3 flex-wrap">
                                 <span class="text-lg font-bold dark:text-gray-200">${s.title}</span>
                                 ${s.cover ? `<span class="text-sm text-gray-400 italic font-medium">(${s.cover} 커버)</span>` : ''}
-                                <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(data.artist + ' ' + s.title)}" target="_blank" class="text-red-500 hover:text-red-600 transition-colors text-lg opacity-0 group-hover:opacity-100"><i class="fab fa-youtube"></i></a>
+                                <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(data.artist + ' ' + s.title)}&sp=EgIQAQ%253D%253D" target="_blank" class="text-red-500 hover:text-red-600 transition-colors text-lg opacity-0 group-hover:opacity-100"><i class="fab fa-youtube"></i></a>
                             </div>
                             ${s.note ? `<p class="text-xs text-indigo-400 font-bold mt-1"><i class="fas fa-info-circle mr-1"></i>${s.note}</p>` : ''}
                         </div>
@@ -307,7 +373,7 @@ async function renderDetailView(data, likeCount, comments, targetId) {
     container.innerHTML = `
         <div class="flex flex-col sm:flex-row justify-between items-start gap-6 mb-12">
             <div class="flex items-center gap-4">
-                <button onclick="navigateTo('home')" class="w-12 h-12 flex items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-indigo-600 transition-all"><i class="fas fa-arrow-left"></i></button>
+                <button onclick="window.history.back()" class="w-12 h-12 flex items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-indigo-600 transition-all"><i class="fas fa-arrow-left"></i></button>
                 <div>
                     <nav class="flex text-xs font-black text-gray-400 uppercase tracking-widest mb-1">
                         <span onclick="navigateTo('setlists')" class="hover:text-indigo-500 cursor-pointer">세트리스트</span>
@@ -319,8 +385,8 @@ async function renderDetailView(data, likeCount, comments, targetId) {
             </div>
             <div class="flex flex-wrap gap-2 w-full sm:w-auto">
                 <button onclick="handleLike('${data.id}')" class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-pink-50 dark:bg-pink-900/20 text-pink-500 rounded-2xl font-black text-sm hover:bg-pink-500 hover:text-white transition-all shadow-sm"><i class="fas fa-heart"></i> ${likeCount}</button>
-                <button class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20"><i class="fas fa-check-circle"></i> 공연 관람 완료</button>
-                ${session ? `
+                <button onclick="handleLike('${data.id}')" class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20"><i class="fas fa-check-circle"></i> 공연 관람 완료</button>
+                ${session && (session.user.id === data.user_id) ? `
                     <button onclick="startEdit('${data.id}')" class="p-3 bg-gray-100 dark:bg-gray-800 rounded-2xl text-gray-500 hover:text-indigo-600 transition-all"><i class="fas fa-edit"></i></button>
                     <button onclick="handleDelete('${data.id}')" class="p-3 bg-red-50 dark:bg-red-900/20 text-red-400 hover:bg-red-500 hover:text-white rounded-2xl transition-all"><i class="fas fa-trash-alt"></i></button>
                 ` : ''}
@@ -368,7 +434,18 @@ async function renderDetailView(data, likeCount, comments, targetId) {
                 <div>
                     <h3 class="text-lg font-black dark:text-white mb-6 flex items-center gap-2"><i class="fas fa-comments text-indigo-500"></i> 팬 후기</h3>
                     <div class="space-y-4 mb-6" id="comments-container">
-                        ${comments.map(c => `<div class="p-5 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800"><div class="flex justify-between items-center mb-2"><span class="text-xs font-black text-indigo-500">${c.user_email.split('@')[0]}</span><span class="text-[10px] text-gray-400">${new Date(c.created_at).toLocaleDateString()}</span></div><p class="text-sm dark:text-gray-300 leading-relaxed">${c.content}</p></div>`).join('')}
+                        ${comments.map(c => `
+                            <div class="p-5 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800 group relative">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-xs font-black text-indigo-500">${c.display_name || c.user_email.split('@')[0]}</span>
+                                    <span class="text-[10px] text-gray-400">${new Date(c.created_at).toLocaleDateString()}</span>
+                                </div>
+                                <p class="text-sm dark:text-gray-300 leading-relaxed">${c.content}</p>
+                                ${session && session.user.id === c.user_id ? `
+                                    <button onclick="handleDeleteComment('${c.id}', '${data.id}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><i class="fas fa-trash-alt text-xs"></i></button>
+                                ` : ''}
+                            </div>
+                        `).join('')}
                     </div>
                     ${session ? `<div class="flex flex-col gap-2"><textarea id="comm-input" placeholder="공연의 감동을 공유해보세요..." class="w-full px-5 py-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none text-sm" rows="3"></textarea><button onclick="postComment('${data.id}')" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 active:scale-[0.98] transition-all">후기 등록</button></div>` : ''}
                 </div>
@@ -384,19 +461,26 @@ async function updateAuthUI() {
     const container = document.getElementById('auth-buttons');
     if (!container) return;
     if (session) {
-        const name = session.user.user_metadata?.full_name || session.user.email.split('@')[0];
+        const name = session.user.user_metadata?.display_name || session.user.user_metadata?.full_name || session.user.email.split('@')[0];
         container.innerHTML = `
-            <div class="flex items-center gap-4">
-                <div class="flex items-center gap-3 bg-gray-100 dark:bg-gray-800 pl-2 pr-4 py-1.5 rounded-2xl border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center gap-2">
+                <button onclick="navigateTo('myattended')" class="text-xs font-black text-gray-500 hover:text-indigo-600 transition-colors px-2">내 공연</button>
+                <div class="flex items-center gap-3 bg-gray-100 dark:bg-gray-800 pl-2 pr-4 py-1.5 rounded-2xl border border-gray-200 dark:border-gray-700 cursor-pointer" onclick="navigateTo('profile')">
                     <img src="${session.user.user_metadata?.avatar_url || 'https://ui-avatars.com/api/?name='+name}" class="w-8 h-8 rounded-xl shadow-sm">
                     <span class="text-sm font-black text-gray-700 dark:text-gray-200 hidden lg:inline">${name}</span>
                 </div>
-                <button id="logout-btn" class="text-xs font-black text-gray-500 hover:text-red-500 transition-colors">로그아웃</button>
+                <button id="logout-btn" class="text-xs font-black text-gray-500 hover:text-red-500 transition-colors ml-2">로그아웃</button>
             </div>`;
-        document.getElementById('logout-btn')?.addEventListener('click', async () => { await sb.auth.signOut(); updateAuthUI(); handleRouting(); });
+        document.getElementById('logout-btn')?.addEventListener('click', async () => { await sb.auth.signOut(); updateAuthUI(); navigateTo('home'); });
     } else {
         container.innerHTML = `<button onclick="toggleAuthModal(true)" class="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black hover:bg-indigo-700 transition-all shadow-lg active:scale-95">로그인</button>`;
     }
+}
+
+window.handleDeleteComment = async (commentId, setlistId) => {
+    if (!confirm('후기를 삭제하시겠습니까?')) return;
+    await sb.from('comments').delete().eq('id', commentId);
+    renderSetlistDetailPage(setlistId);
 }
 
 window.toggleModal = (s) => { document.getElementById('add-modal').classList.toggle('hidden', !s); document.body.style.overflow = s ? 'hidden' : 'auto'; }
@@ -424,7 +508,8 @@ window.postComment = async (id) => {
     const content = input.value.trim();
     if (!content) return;
     const { data: { session } } = await sb.auth.getSession();
-    await sb.from('comments').insert({ setlist_id: id, user_id: session.user.id, user_email: session.user.email, content: content });
+    const nickname = session.user.user_metadata?.display_name || session.user.email.split('@')[0];
+    await sb.from('comments').insert({ setlist_id: id, user_id: session.user.id, user_email: session.user.email, display_name: nickname, content: content });
     input.value = ''; renderSetlistDetailPage(id);
 }
 
@@ -460,10 +545,24 @@ window.startEdit = async (id) => {
     };
 }
 
+// --- Data Seeding (2026 Sample Data) ---
+async function seed2026Data() {
+    const { count } = await sb.from('setlists').select('*', { count: 'exact', head: true });
+    if (count > 10) return; // Skip if already has data
+    
+    const samples = [
+        { artist: 'BTS', performance_date: '2026-06-12', concert: "BTS WORLD TOUR 'ARIRANG'", venue: '부산 아시아드 주경기장', location: '부산, 대한민국', category: 'Concert', songs: ['Dynamite', 'Butter', 'Arirang (Special Remix)', '--- Encore ---', 'Yet To Come'] },
+        { artist: '서울재즈페스티벌', performance_date: '2026-05-22', concert: '서울재즈페스티벌 2026', venue: '올림픽공원 88잔디마당', location: '서울, 대한민국', category: 'Festival', songs: ['Jazz Intro', 'Summertime', 'Blue in Green'] },
+        { artist: '포스트 말론', performance_date: '2026-09-20', concert: 'Live in Seoul', venue: '고양 종합운동장', location: '고양, 대한민국', category: 'Concert', songs: ['Circles', 'Sunflower', 'Rockstar'] }
+    ];
+    await sb.from('setlists').insert(samples);
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     updateAuthUI();
     handleRouting();
+    seed2026Data();
     document.getElementById('setlist-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const { data: { session } } = await sb.auth.getSession();
