@@ -129,7 +129,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-20 items-center">
                 <div class="flex items-center">
-                    <a href="#" onclick="navigateTo('home')" class="text-4xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter italic mr-8">선곡표</a>
+                    <a href="#" onclick="window.navigateTo('home')" class="text-4xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter italic mr-8">선곡표</a>
                     <div class="hidden xl:flex space-x-6">
                         <a href="#/setlists" class="text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold transition-colors text-base">선곡표</a>
                         <a href="#/artists" class="text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold transition-colors text-base">아티스트</a>
@@ -151,19 +151,30 @@
                         <!-- Auth buttons injected by JS -->
                     </div>
                     <!-- Mobile Menu Button -->
-                    <button onclick="toggleMobileMenu()" class="xl:hidden text-gray-500 hover:text-indigo-600 text-2xl p-2">
+                    <button onclick="window.toggleMobileMenu(true)" class="xl:hidden text-gray-500 hover:text-indigo-600 text-2xl p-2 transition-transform active:scale-90">
                         <i class="fas fa-bars"></i>
                     </button>
                 </div>
             </div>
         </div>
-        <!-- Mobile Dropdown Menu -->
-        <div id="mobile-menu" class="hidden xl:hidden bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-4 py-6 space-y-4">
-            <a href="#/setlists" onclick="toggleMobileMenu()" class="block text-gray-700 dark:text-gray-300 font-bold text-lg">선곡표</a>
-            <a href="#/artists" onclick="toggleMobileMenu()" class="block text-gray-700 dark:text-gray-300 font-bold text-lg">아티스트</a>
-            <a href="#/festivals" onclick="toggleMobileMenu()" class="block text-gray-700 dark:text-gray-300 font-bold text-lg">페스티벌</a>
-            <a href="#/venues" onclick="toggleMobileMenu()" class="block text-gray-700 dark:text-gray-300 font-bold text-lg">공연장</a>
-            <a href="#/stats" onclick="toggleMobileMenu()" class="block text-gray-700 dark:text-gray-300 font-bold text-lg">통계</a>
+        <!-- Mobile Menu Overlay (Dimmed Background) -->
+        <div id="mobile-overlay" class="fixed inset-0 bg-gray-950/60 backdrop-blur-sm z-[100] hidden" onclick="window.toggleMobileMenu(false)"></div>
+        <!-- Mobile Dropdown Menu (Slider style) -->
+        <div id="mobile-menu" class="fixed top-0 right-0 h-full w-4/5 max-w-xs bg-white dark:bg-gray-900 z-[101] shadow-2xl transform translate-x-0 transition-transform duration-300 hidden p-8 space-y-8">
+            <div class="flex justify-between items-center mb-8">
+                <span class="text-2xl font-black text-indigo-600 italic">메뉴</span>
+                <button onclick="window.toggleMobileMenu(false)" class="text-gray-400 text-2xl"><i class="fas fa-times"></i></button>
+            </div>
+            <nav class="flex flex-col space-y-6">
+                <a href="#/setlists" class="flex items-center gap-4 text-xl font-black text-gray-700 dark:text-gray-200"><i class="fas fa-list-ul w-8 text-indigo-500"></i> 선곡표</a>
+                <a href="#/artists" class="flex items-center gap-4 text-xl font-black text-gray-700 dark:text-gray-200"><i class="fas fa-user-astronaut w-8 text-indigo-500"></i> 아티스트</a>
+                <a href="#/festivals" class="flex items-center gap-4 text-xl font-black text-gray-700 dark:text-gray-200"><i class="fas fa-republican w-8 text-indigo-500"></i> 페스티벌</a>
+                <a href="#/venues" class="flex items-center gap-4 text-xl font-black text-gray-700 dark:text-gray-200"><i class="fas fa-map-marker-alt w-8 text-indigo-500"></i> 공연장</a>
+                <a href="#/stats" class="flex items-center gap-4 text-xl font-black text-gray-700 dark:text-gray-200"><i class="fas fa-crown w-8 text-indigo-500"></i> 통계</a>
+                <div class="pt-8 border-t border-gray-100 dark:border-gray-800">
+                    <button onclick="window.navigateTo('myattended')" class="flex items-center gap-4 text-xl font-black text-gray-500"><i class="fas fa-check-circle w-8"></i> 내 공연</button>
+                </div>
+            </nav>
         </div>
     </nav>
 

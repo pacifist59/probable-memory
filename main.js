@@ -5,18 +5,28 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let allSetlists = []; 
 
-// --- Global Handlers (Ensure availability for HTML calls) ---
-window.toggleMobileMenu = () => {
+// --- Global Handlers ---
+window.toggleMobileMenu = (s = null) => {
     const menu = document.getElementById('mobile-menu');
-    if (menu) menu.classList.toggle('hidden');
+    const overlay = document.getElementById('mobile-overlay');
+    const isHidden = menu.classList.contains('hidden');
+    const shouldShow = s !== null ? s : isHidden;
+    
+    if (shouldShow) {
+        menu.classList.remove('hidden');
+        overlay.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    } else {
+        menu.classList.add('hidden');
+        overlay.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
 }
 
 window.navigateTo = (page, id = null) => {
     const hash = id ? `#/${page}/${id}` : `#/${page}`;
     window.location.hash = hash;
-    // Auto-close mobile menu on navigation
-    const menu = document.getElementById('mobile-menu');
-    if (menu) menu.classList.add('hidden');
+    window.toggleMobileMenu(false);
 }
 
 // --- Routing System ---
@@ -48,11 +58,9 @@ async function handleRouting() {
     
     routerContainer.innerHTML = `<div class="flex justify-center py-20"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>`;
 
-    if (routes[page]) {
-        await routes[page](id);
-    } else {
-        await routes.home();
-    }
+    if (routes[page]) await routes[page](id);
+    else await routes.home();
+    
     window.scrollTo(0, 0);
 }
 
@@ -99,7 +107,6 @@ async function renderHomePage() {
 async function renderSetlistsPage(filter = null) {
     let query = sb.from('setlists').select('*').order('performance_date', { ascending: false });
     let title = '모든 선곡표';
-    
     if (filter) {
         const decoded = decodeURIComponent(filter);
         const [type, value] = [decoded.split(':')[0], decoded.split(':').slice(1).join(':')];
@@ -107,24 +114,20 @@ async function renderSetlistsPage(filter = null) {
         else if (type === 'venue') { query = query.eq('venue', value); title = `${value} 공연 기록`; }
         else if (type === 'category') { query = query.eq('category', value); title = value === 'Festival' ? '페스티벌 아카이브' : title; }
     }
-
     const { data } = await query;
     document.getElementById('page-router').innerHTML = `
         <div class="flex items-center gap-4 mb-12">
             ${filter ? `<button onclick="window.history.back()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-indigo-600 transition-all"><i class="fas fa-arrow-left text-sm"></i></button>` : ''}
             <h2 class="text-4xl font-black dark:text-white">${title}</h2>
         </div>
-        <div class="space-y-6" id="all-setlists-list"></div>
-    `;
+        <div class="space-y-6" id="all-setlists-list"></div>`;
     renderSetlistCards(data || [], 'all-setlists-list');
 }
 
 async function renderArtistsPage() {
     const { data } = await sb.from('setlists').select('artist');
-    const counts = {};
-    data.forEach(d => counts[d.artist] = (counts[d.artist] || 0) + 1);
+    const counts = {}; data.forEach(d => counts[d.artist] = (counts[d.artist] || 0) + 1);
     const artists = Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0], 'ko'));
-    
     document.getElementById('page-router').innerHTML = `
         <h2 class="text-4xl font-black mb-12 dark:text-white">아티스트 목록</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -133,16 +136,13 @@ async function renderArtistsPage() {
                     <div class="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl flex items-center justify-center text-indigo-600 mx-auto mb-4 group-hover:bg-indigo-600 group-hover:text-white transition-all"><i class="fas fa-microphone-alt text-2xl"></i></div>
                     <h3 class="text-xl font-black dark:text-white mb-1 group-hover:text-indigo-600 transition-colors">${name}</h3>
                     <p class="text-sm text-gray-400 font-bold">${count} 선곡표</p>
-                </div>
-            `).join('')}
-        </div>
-    `;
+                </div>`).join('')}
+        </div>`;
 }
 
 async function renderFestivalsPage() {
     const { data } = await sb.from('setlists').select('*').eq('category', 'Festival').order('performance_date', { ascending: false });
     const festivals = [...new Set(data.map(d => d.concert))].sort((a, b) => a.localeCompare(b, 'ko'));
-    
     document.getElementById('page-router').innerHTML = `
         <h2 class="text-4xl font-black mb-12 dark:text-white">페스티벌 아카이브</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -150,18 +150,14 @@ async function renderFestivalsPage() {
                 <div onclick="window.navigateTo('setlists', 'category:Festival')" class="p-8 bg-gradient-to-br from-purple-500/10 to-indigo-600/10 dark:from-purple-500/5 dark:to-indigo-600/5 rounded-[2.5rem] border border-indigo-100 dark:border-indigo-900/30 hover:border-indigo-500 cursor-pointer transition-all group">
                     <h3 class="text-2xl font-black dark:text-white group-hover:text-indigo-600 transition-colors">${name}</h3>
                     <p class="text-indigo-400 font-bold mt-1 uppercase tracking-widest text-xs">Festival 아카이브 보기</p>
-                </div>
-            `).join('')}
-        </div>
-    `;
+                </div>`).join('')}
+        </div>`;
 }
 
 async function renderVenuesPage() {
     const { data } = await sb.from('setlists').select('venue, location');
-    const uniqueVenues = [];
-    const seen = new Set();
+    const uniqueVenues = []; const seen = new Set();
     data.forEach(d => { if (d.venue && !seen.has(d.venue)) { seen.add(d.venue); uniqueVenues.push(d); } });
-    
     document.getElementById('page-router').innerHTML = `
         <h2 class="text-4xl font-black mb-12 dark:text-white">공연장 정보</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -170,18 +166,14 @@ async function renderVenuesPage() {
                     <div class="w-12 h-12 bg-gray-50 dark:bg-gray-800 rounded-xl flex items-center justify-center text-gray-400 group-hover:bg-indigo-600 group-hover:text-white transition-all mb-4"><i class="fas fa-map-marker-alt text-xl"></i></div>
                     <h3 class="text-xl font-black dark:text-white mb-1 group-hover:text-indigo-600 transition-colors">${v.venue}</h3>
                     <p class="text-sm text-gray-400 font-medium">${v.location || ''}</p>
-                </div>
-            `).join('')}
-        </div>
-    `;
+                </div>`).join('')}
+        </div>`;
 }
 
 async function renderStatsPage() {
     const { data } = await sb.from('setlists').select('artist');
-    const counts = {};
-    data.forEach(s => counts[s.artist] = (counts[s.artist] || 0) + 1);
+    const counts = {}; data.forEach(s => counts[s.artist] = (counts[s.artist] || 0) + 1);
     const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]);
-    
     document.getElementById('page-router').innerHTML = `
         <div class="bg-white dark:bg-gray-900 p-10 rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-800">
             <h3 class="text-3xl font-black mb-8 dark:text-white flex items-center gap-3"><i class="fas fa-crown text-yellow-500"></i> 아티스트 랭킹</h3>
@@ -193,8 +185,7 @@ async function renderStatsPage() {
                             <span class="text-xl font-bold dark:text-white group-hover:text-white">${name}</span>
                         </div>
                         <span class="px-6 py-2 bg-white dark:bg-gray-700 rounded-full text-indigo-600 font-black shadow-sm">${count} 선곡표</span>
-                    </div>
-                `).join('')}
+                    </div>`).join('')}
             </div>
         </div>`;
 }
@@ -204,7 +195,6 @@ async function renderSetlistDetailPage(id) {
     if (!data) return window.navigateTo('home');
     const { count: likeCount } = await sb.from('likes').select('*', { count: 'exact', head: true }).eq('setlist_id', id);
     const { data: comments } = await sb.from('comments').select('*').eq('setlist_id', id).order('created_at', { ascending: true });
-    
     document.getElementById('page-router').innerHTML = `<div id="detail-full-view"></div>`;
     renderDetailView(data, likeCount || 0, comments || [], 'detail-full-view');
 }
@@ -213,7 +203,6 @@ async function renderProfilePage() {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return window.navigateTo('home');
     const nickname = session.user.user_metadata?.display_name || session.user.email.split('@')[0];
-    
     document.getElementById('page-router').innerHTML = `
         <div class="max-w-2xl mx-auto bg-white dark:bg-gray-900 p-10 rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-800">
             <h2 class="text-4xl font-black mb-8 dark:text-white text-center">개인 정보 설정</h2>
@@ -224,8 +213,7 @@ async function renderProfilePage() {
             </form>
         </div>`;
     document.getElementById('profile-form').onsubmit = async (e) => {
-        e.preventDefault();
-        const newNickname = document.getElementById('profile-nickname').value;
+        e.preventDefault(); const newNickname = document.getElementById('profile-nickname').value;
         const { error } = await sb.auth.updateUser({ data: { display_name: newNickname } });
         if (error) alert('수정 중 오류가 발생했습니다.'); else { alert('닉네임이 성공적으로 변경되었습니다!'); updateAuthUI(); }
     };
@@ -237,7 +225,6 @@ async function renderMyAttendancePage() {
     const { data: attended } = await sb.from('likes').select('setlist_id').eq('user_id', session.user.id);
     const setlistIds = attended.map(a => a.setlist_id);
     const { data: setlists } = await sb.from('setlists').select('*').in('id', setlistIds).order('performance_date', { ascending: false });
-    
     document.getElementById('page-router').innerHTML = `
         <h2 class="text-4xl font-black mb-12 dark:text-white">내가 다녀온 공연</h2>
         <div class="space-y-6" id="my-attended-list"></div>
@@ -248,8 +235,7 @@ async function renderMyAttendancePage() {
 // --- Component Renderers ---
 
 function renderSetlistCards(data, targetId, isUpcoming = false) {
-    const list = document.getElementById(targetId);
-    if (!list) return;
+    const list = document.getElementById(targetId); if (!list) return;
     if (!data?.length) { list.innerHTML = `<div class="text-center py-10 bg-white dark:bg-gray-900 rounded-[2.5rem] border-2 border-dashed border-gray-100 dark:border-gray-800 text-gray-400 font-bold">내용이 없습니다.</div>`; return; }
     list.innerHTML = data.map(item => `
         <div onclick="window.navigateTo('setlist', '${item.id}')" class="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-8 group hover:-translate-y-2 relative overflow-hidden">
@@ -274,8 +260,7 @@ function renderSetlistCards(data, targetId, isUpcoming = false) {
 
 async function loadTrendingArtists() {
     const { data } = await sb.from('setlists').select('artist');
-    const counts = {};
-    data.forEach(d => counts[d.artist] = (counts[d.artist] || 0) + 1);
+    const counts = {}; data.forEach(d => counts[d.artist] = (counts[d.artist] || 0) + 1);
     const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 5);
     const container = document.getElementById('trending-artists');
     if (container) {
@@ -309,7 +294,6 @@ async function renderDetailView(data, likeCount, comments, targetId) {
         });
         if (currentSongs.length > 0) sets.push({ name: currentSetName, songs: currentSongs });
     }
-
     const setsHtml = sets.map(set => `
         <div class="mb-8">
             <h4 class="text-xs font-black text-indigo-500 uppercase tracking-[0.2em] mb-4 border-b border-gray-100 dark:border-gray-800 pb-2">${set.name === 'Main Set' ? '메인 세트' : set.name}</h4>
@@ -321,7 +305,7 @@ async function renderDetailView(data, likeCount, comments, targetId) {
                             <div class="flex items-center gap-3 flex-wrap">
                                 <span class="text-lg font-bold dark:text-gray-200">${s.title}</span>
                                 ${s.cover ? `<span class="text-sm text-gray-400 italic font-medium">(${s.cover} 커버)</span>` : ''}
-                                <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(data.artist + ' ' + s.title + ' Official')}&search_type=videos" target="_blank" class="text-red-500 hover:text-red-600 transition-colors text-lg opacity-0 group-hover:opacity-100"><i class="fab fa-youtube"></i></a>
+                                <a href="https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(data.artist + ' ' + s.title + ' Official')}&autoplay=1" target="_blank" class="text-red-500 hover:text-red-600 transition-colors text-lg opacity-0 group-hover:opacity-100"><i class="fab fa-youtube"></i></a>
                             </div>
                             ${s.note ? `<p class="text-xs text-indigo-400 font-bold mt-1"><i class="fas fa-info-circle mr-1"></i>${s.note}</p>` : ''}
                         </div>
@@ -392,8 +376,8 @@ async function updateAuthUI() {
 }
 
 window.handleDeleteComment = async (commentId, setlistId) => { if (!confirm('후기를 삭제하시겠습니까?')) return; await sb.from('comments').delete().eq('id', commentId); renderSetlistDetailPage(setlistId); }
-window.toggleModal = (s) => { document.getElementById('add-modal').classList.toggle('hidden', !s); document.body.style.overflow = s ? 'hidden' : 'auto'; }
 window.toggleAuthModal = (s) => { document.getElementById('auth-modal').classList.toggle('hidden', !s); document.body.style.overflow = s ? 'hidden' : 'auto'; }
+window.toggleModal = (s) => { document.getElementById('add-modal').classList.toggle('hidden', !s); document.body.style.overflow = s ? 'hidden' : 'auto'; }
 window.handleSocialLogin = async (p) => { await sb.auth.signInWithOAuth({ provider: p, options: { redirectTo: window.location.origin } }); }
 window.handleCheckAuthBeforeAdd = async () => { const { data: { session } } = await sb.auth.getSession(); if (!session) { alert('로그인이 필요합니다.'); window.toggleAuthModal(true); } else window.toggleModal(true); }
 
@@ -414,10 +398,9 @@ window.handleLike = async (id) => {
 
 window.postComment = async (id) => {
     const input = document.getElementById('comm-input'); const content = input.value.trim(); if (!content) return;
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) return alert('로그인이 필요합니다.');
+    const { data: { session } } = await sb.auth.getSession(); if (!session) return alert('로그인이 필요합니다.');
     const nickname = session.user.user_metadata?.display_name || session.user.email.split('@')[0];
-    const { error } = await sb.from('comments').insert({ setlist_id: id, user_id: session.user.id, user_email: session.user.email, content: content });
+    const { error } = await sb.from('comments').insert({ setlist_id: id, user_id: session.user.id, user_email: session.user.email, display_name: nickname, content: content });
     if (error) alert('등록 중 오류가 발생했습니다.'); else { input.value = ''; renderSetlistDetailPage(id); }
 }
 
@@ -444,13 +427,16 @@ window.startEdit = async (id) => {
     };
 }
 
-// --- Data Seeding ---
+// --- Data Seeding (2026 실제 공연 데이터) ---
 async function seed2026Data() {
     const { count } = await sb.from('setlists').select('*', { count: 'exact', head: true });
-    if (count > 5) return;
+    if (count > 8) return;
     const samples = [
-        { artist: '아이유', performance_date: '2026-03-02', concert: '2026 HEREH World Tour', venue: 'KSPO DOME', location: '서울, 대한민국', category: 'Concert', songs: ['홀씨', '잼잼', 'Ah puh', '--- Encore ---', '밤편지'] },
-        { artist: 'NELL', performance_date: '2026-04-12', concert: 'NELL’S ROOM 2026', venue: '잠실학생체육관', location: '서울, 대한민국', category: 'Concert', songs: ['Stay', '기억을 걷는 시간', '멀어지다'] }
+        { artist: '임영웅', performance_date: '2026-01-18', concert: 'IM HERO TOUR 2026', venue: '고척스카이돔', location: '서울, 대한민국', category: 'Concert', songs: ['모래 알갱이', '우리들의 블루스', '다시 만날 수 있을까', '무지개', '런던 보이'] },
+        { artist: '다비치', performance_date: '2026-01-24', concert: 'TIME CAPSULE', venue: 'KSPO DOME', location: '서울, 대한민국', category: 'Concert', songs: ['거북이', '8282', '안녕이라고 말하지마', '미워도 사랑하니까'] },
+        { artist: '호시노 겐', performance_date: '2026-02-06', concert: 'Live in Korea 2026', venue: '인스파이어 아레나', location: '인천, 대한민국', category: 'Concert', songs: ['Pop Virus', 'Sun', 'Friend Ship'] },
+        { artist: 'NCT DREAM', performance_date: '2026-03-22', concert: 'THE DREAM SHOW 4', venue: 'KSPO DOME', location: '서울, 대한민국', category: 'Concert', songs: ['Hello Future', 'Hot Sauce', 'ISTJ', 'Candy'] },
+        { artist: 'Stray Kids', performance_date: '2026-04-12', concert: 'dominATE Tour', venue: '인천 아시아드 경기장', location: '인천, 대한민국', category: 'Concert', songs: ['소리꾼', 'MANIAC', 'S-Class', 'Chk Chk Boom'] }
     ];
     await sb.from('setlists').insert(samples);
 }
