@@ -9,16 +9,25 @@ let allSetlists = [];
 window.toggleMobileMenu = (s = null) => {
     const menu = document.getElementById('mobile-menu');
     const overlay = document.getElementById('mobile-overlay');
+    if (!menu) return;
     const isHidden = menu.classList.contains('hidden');
     const shouldShow = s !== null ? s : isHidden;
     
     if (shouldShow) {
         menu.classList.remove('hidden');
         overlay.classList.remove('hidden');
+        setTimeout(() => {
+            menu.style.transform = 'translateX(0)';
+            overlay.style.opacity = '1';
+        }, 10);
         document.body.style.overflow = 'hidden';
     } else {
-        menu.classList.add('hidden');
-        overlay.classList.add('hidden');
+        menu.style.transform = 'translateX(100%)';
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+            menu.classList.add('hidden');
+            overlay.classList.add('hidden');
+        }, 300);
         document.body.style.overflow = 'auto';
     }
 }
@@ -305,7 +314,7 @@ async function renderDetailView(data, likeCount, comments, targetId) {
                             <div class="flex items-center gap-3 flex-wrap">
                                 <span class="text-lg font-bold dark:text-gray-200">${s.title}</span>
                                 ${s.cover ? `<span class="text-sm text-gray-400 italic font-medium">(${s.cover} 커버)</span>` : ''}
-                                <a href="https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(data.artist + ' ' + s.title + ' Official')}&autoplay=1" target="_blank" class="text-red-500 hover:text-red-600 transition-colors text-lg opacity-0 group-hover:opacity-100"><i class="fab fa-youtube"></i></a>
+                                <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(data.artist + ' ' + s.title + ' Official')}" target="_blank" class="text-red-500 hover:text-red-600 transition-colors text-lg opacity-0 group-hover:opacity-100"><i class="fab fa-youtube"></i></a>
                             </div>
                             ${s.note ? `<p class="text-xs text-indigo-400 font-bold mt-1"><i class="fas fa-info-circle mr-1"></i>${s.note}</p>` : ''}
                         </div>
@@ -357,21 +366,36 @@ async function renderDetailView(data, likeCount, comments, targetId) {
 async function updateAuthUI() {
     const { data: { session } } = await sb.auth.getSession();
     const container = document.getElementById('auth-buttons');
+    const mobileSection = document.getElementById('mobile-auth-section');
     if (!container) return;
+
     if (session) {
         const name = session.user.user_metadata?.display_name || session.user.user_metadata?.full_name || session.user.email.split('@')[0];
+        const userHtml = `
+            <div class="flex items-center gap-3 bg-gray-100 dark:bg-gray-800 pl-2 pr-4 py-1.5 rounded-2xl border border-gray-200 dark:border-gray-700 cursor-pointer" onclick="window.navigateTo('profile')">
+                <img src="${session.user.user_metadata?.avatar_url || 'https://ui-avatars.com/api/?name='+name}" class="w-8 h-8 rounded-xl shadow-sm">
+                <span class="text-sm font-black text-gray-700 dark:text-gray-200 hidden lg:inline">${name}</span>
+            </div>`;
+        
         container.innerHTML = `
             <div class="flex items-center gap-2">
                 <button onclick="window.navigateTo('myattended')" class="text-xs font-black text-gray-500 hover:text-indigo-600 transition-colors px-2 hidden sm:inline">내 공연</button>
-                <div class="flex items-center gap-3 bg-gray-100 dark:bg-gray-800 pl-2 pr-4 py-1.5 rounded-2xl border border-gray-200 dark:border-gray-700 cursor-pointer" onclick="window.navigateTo('profile')">
-                    <img src="${session.user.user_metadata?.avatar_url || 'https://ui-avatars.com/api/?name='+name}" class="w-8 h-8 rounded-xl shadow-sm">
-                    <span class="text-sm font-black text-gray-700 dark:text-gray-200 hidden lg:inline">${name}</span>
-                </div>
+                ${userHtml}
                 <button id="logout-btn" class="text-xs font-black text-gray-500 hover:text-red-500 transition-colors ml-2 hidden sm:inline">로그아웃</button>
             </div>`;
+        
+        if (mobileSection) {
+            mobileSection.innerHTML = `
+                <button onclick="window.navigateTo('myattended')" class="w-full flex items-center gap-4 py-4 px-6 rounded-2xl text-xl font-black text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-800/50"><i class="fas fa-check-circle w-8 text-indigo-500"></i> 내 공연</button>
+                <button onclick="window.navigateTo('profile')" class="w-full flex items-center gap-4 py-4 px-6 rounded-2xl text-xl font-black text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-800/50"><i class="fas fa-user-circle w-8 text-indigo-500"></i> 프로필 수정</button>
+                <button id="mobile-logout-btn" class="w-full flex items-center gap-4 py-4 px-6 rounded-2xl text-xl font-black text-red-500 bg-red-50 dark:bg-red-900/10 mt-4"><i class="fas fa-sign-out-alt w-8"></i> 로그아웃</button>
+            `;
+            document.getElementById('mobile-logout-btn')?.addEventListener('click', async () => { await sb.auth.signOut(); updateAuthUI(); window.navigateTo('home'); });
+        }
         document.getElementById('logout-btn')?.addEventListener('click', async () => { await sb.auth.signOut(); updateAuthUI(); window.navigateTo('home'); });
     } else {
         container.innerHTML = `<button onclick="window.toggleAuthModal(true)" class="bg-indigo-600 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-2xl font-black hover:bg-indigo-700 transition-all shadow-lg active:scale-95 text-sm sm:text-base">로그인</button>`;
+        if (mobileSection) mobileSection.innerHTML = `<button onclick="window.toggleAuthModal(true); window.toggleMobileMenu(false);" class="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-xl shadow-lg">로그인하기</button>`;
     }
 }
 
@@ -399,9 +423,9 @@ window.handleLike = async (id) => {
 window.postComment = async (id) => {
     const input = document.getElementById('comm-input'); const content = input.value.trim(); if (!content) return;
     const { data: { session } } = await sb.auth.getSession(); if (!session) return alert('로그인이 필요합니다.');
-    const nickname = session.user.user_metadata?.display_name || session.user.email.split('@')[0];
+    const nickname = session.user.user_metadata?.display_name || session.user.user_metadata?.full_name || session.user.email.split('@')[0];
     const { error } = await sb.from('comments').insert({ setlist_id: id, user_id: session.user.id, user_email: session.user.email, display_name: nickname, content: content });
-    if (error) alert('등록 중 오류가 발생했습니다.'); else { input.value = ''; renderSetlistDetailPage(id); }
+    if (error) { console.error('Comment Error:', error); alert('후기 등록 중 오류가 발생했습니다.'); } else { input.value = ''; renderSetlistDetailPage(id); }
 }
 
 window.handleDelete = async (id) => { if (!confirm('정말로 삭제하시겠습니까?')) return; await sb.from('setlists').delete().match({ id }); window.navigateTo('home'); }
