@@ -185,7 +185,7 @@ async function renderDetailView(data, likeCount, comments) {
 
     const setsHtml = sets.map(set => `
         <div class="mb-8">
-            <h4 class="text-xs font-black text-indigo-500 uppercase tracking-[0.2em] mb-4 border-b border-gray-100 dark:border-gray-800 pb-2">${set.name}</h4>
+            <h4 class="text-xs font-black text-indigo-500 uppercase tracking-[0.2em] mb-4 border-b border-gray-100 dark:border-gray-800 pb-2">${set.name === 'Main Set' ? '메인 세트' : set.name}</h4>
             <div class="space-y-1">
                 ${set.songs.map((s, i) => `
                     <div class="flex items-start gap-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
@@ -193,7 +193,7 @@ async function renderDetailView(data, likeCount, comments) {
                         <div class="flex-1">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="text-lg font-bold dark:text-gray-200">${s.title}</span>
-                                ${s.cover ? `<span class="text-sm text-gray-400 italic font-medium">(${s.cover} cover)</span>` : ''}
+                                ${s.cover ? `<span class="text-sm text-gray-400 italic font-medium">(${s.cover} 커버)</span>` : ''}
                             </div>
                             ${s.note ? `<p class="text-xs text-indigo-400 font-bold mt-1"><i class="fas fa-info-circle mr-1"></i>${s.note}</p>` : ''}
                         </div>
@@ -209,16 +209,16 @@ async function renderDetailView(data, likeCount, comments) {
                 <button onclick="toggleDetailModal(false)" class="w-12 h-12 flex items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-indigo-600 transition-all"><i class="fas fa-arrow-left"></i></button>
                 <div>
                     <nav class="flex text-xs font-black text-gray-400 uppercase tracking-widest mb-1">
-                        <span class="hover:text-indigo-500 cursor-pointer">Setlists</span>
+                        <span class="hover:text-indigo-500 cursor-pointer">세트리스트</span>
                         <span class="mx-2">/</span>
                         <span class="text-indigo-500">${data.artist}</span>
                     </nav>
-                    <h2 class="text-4xl font-black dark:text-white tracking-tighter">${data.artist} <span class="text-indigo-500 font-light ml-2">Setlist</span></h2>
+                    <h2 class="text-4xl font-black dark:text-white tracking-tighter">${data.artist} <span class="text-indigo-500 font-light ml-2">세트리스트</span></h2>
                 </div>
             </div>
             <div class="flex flex-wrap gap-2 w-full sm:w-auto">
                 <button onclick="handleLike('${data.id}')" class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-pink-50 dark:bg-pink-900/20 text-pink-500 rounded-2xl font-black text-sm hover:bg-pink-500 hover:text-white transition-all shadow-sm"><i class="fas fa-heart"></i> ${likeCount}</button>
-                <button class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20"><i class="fas fa-check-circle"></i> I was there</button>
+                <button class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20"><i class="fas fa-check-circle"></i> 공연 관람 완료</button>
                 ${session ? `
                     <button onclick="startEdit()" class="p-3 bg-gray-100 dark:bg-gray-800 rounded-2xl text-gray-500 hover:text-indigo-600 transition-all"><i class="fas fa-edit"></i></button>
                     <button onclick="handleDelete('${data.id}')" class="p-3 bg-red-50 dark:bg-red-900/20 text-red-400 hover:bg-red-500 hover:text-white rounded-2xl transition-all"><i class="fas fa-trash-alt"></i></button>
@@ -236,22 +236,22 @@ async function renderDetailView(data, likeCount, comments) {
                                 <div class="flex items-center gap-3">
                                     <div class="w-10 h-10 rounded-xl bg-white dark:bg-gray-900 flex items-center justify-center text-indigo-500 shadow-sm border border-gray-100 dark:border-gray-800"><i class="fas fa-calendar"></i></div>
                                     <div>
-                                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Performance Date</p>
-                                        <p class="font-bold dark:text-white">${new Date(data.performance_date).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">공연 날짜</p>
+                                        <p class="font-bold dark:text-white">${new Date(data.performance_date).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <div class="w-10 h-10 rounded-xl bg-white dark:bg-gray-900 flex items-center justify-center text-purple-500 shadow-sm border border-gray-100 dark:border-gray-800"><i class="fas fa-map-marker-alt"></i></div>
                                     <div>
-                                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Venue & Location</p>
-                                        <p class="font-bold dark:text-white">${data.venue}, ${data.location || 'Unknown'}</p>
+                                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">공연장 및 위치</p>
+                                        <p class="font-bold dark:text-white">${data.venue}, ${data.location || '정보 없음'}</p>
                                     </div>
                                 </div>
                                 ${data.concert ? `
                                 <div class="flex items-center gap-3">
                                     <div class="w-10 h-10 rounded-xl bg-white dark:bg-gray-900 flex items-center justify-center text-orange-500 shadow-sm border border-gray-100 dark:border-gray-800"><i class="fas fa-ticket-alt"></i></div>
                                     <div>
-                                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tour</p>
+                                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">투어</p>
                                         <p class="font-bold dark:text-white">${data.concert}</p>
                                     </div>
                                 </div>` : ''}
@@ -260,14 +260,14 @@ async function renderDetailView(data, likeCount, comments) {
                     </div>
                     
                     <div class="bg-white dark:bg-gray-900 rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100 dark:border-gray-800">
-                        ${setsHtml || `<p class="text-center py-10 text-gray-400 font-medium">No songs recorded yet.</p>`}
+                        ${setsHtml || `<p class="text-center py-10 text-gray-400 font-medium">등록된 곡이 없습니다.</p>`}
                     </div>
                 </div>
             </div>
 
             <div class="lg:col-span-4 space-y-8">
                 <div>
-                    <h3 class="text-lg font-black dark:text-white mb-6 flex items-center gap-2"><i class="fas fa-comments text-indigo-500"></i> Fan Comments</h3>
+                    <h3 class="text-lg font-black dark:text-white mb-6 flex items-center gap-2"><i class="fas fa-comments text-indigo-500"></i> 팬 후기</h3>
                     <div class="space-y-4 mb-6">
                         ${comments.length > 0 ? comments.map(c => `
                             <div class="p-5 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
@@ -277,20 +277,20 @@ async function renderDetailView(data, likeCount, comments) {
                                 </div>
                                 <p class="text-sm dark:text-gray-300 leading-relaxed">${c.content}</p>
                             </div>
-                        `).join('') : '<p class="text-center py-6 text-gray-400 text-sm font-medium">Be the first to comment!</p>'}
+                        `).join('') : '<p class="text-center py-6 text-gray-400 text-sm font-medium">첫 후기를 남겨보세요!</p>'}
                     </div>
                     ${session ? `
                         <div class="flex flex-col gap-2">
-                            <textarea id="comm-input" placeholder="Share your experience..." class="w-full px-5 py-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none text-sm" rows="3"></textarea>
-                            <button onclick="postComment('${data.id}')" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 active:scale-[0.98] transition-all">Post Comment</button>
+                            <textarea id="comm-input" placeholder="공연의 감동을 공유해보세요..." class="w-full px-5 py-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none text-sm" rows="3"></textarea>
+                            <button onclick="postComment('${data.id}')" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 active:scale-[0.98] transition-all">후기 등록</button>
                         </div>
                     ` : ''}
                 </div>
                 
                 <div class="p-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2.5rem] text-white shadow-xl">
-                    <h4 class="font-black text-xl mb-3 leading-tight">Missing Information?</h4>
-                    <p class="text-indigo-100 text-sm mb-6 leading-relaxed">Help other fans by adding missing songs or fixing details of this setlist.</p>
-                    <button onclick="startEdit()" class="w-full py-3 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-xl font-bold hover:bg-white/30 transition-all">Edit Setlist</button>
+                    <h4 class="font-black text-xl mb-3 leading-tight">정보가 잘못되었나요?</h4>
+                    <p class="text-indigo-100 text-sm mb-6 leading-relaxed">누락된 곡을 추가하거나 잘못된 정보를 수정하여 다른 팬들을 도와주세요.</p>
+                    <button onclick="startEdit()" class="w-full py-3 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-xl font-bold hover:bg-white/30 transition-all">정보 수정하기</button>
                 </div>
             </div>
         </div>
