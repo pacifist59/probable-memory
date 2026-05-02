@@ -30,15 +30,15 @@ async function updateAuthUI() {
     if (!container) return;
     if (session) {
         const name = session.user.user_metadata?.full_name || session.user.email.split('@')[0];
-        container.innerHTML = "` +
-            `<div class="flex items-center gap-4">
+        container.innerHTML = `
+            <div class="flex items-center gap-4">
                 <div class="flex items-center gap-3 bg-gray-100 dark:bg-gray-800 pl-2 pr-4 py-1.5 rounded-2xl border border-gray-200 dark:border-gray-700">
                     <img src="${session.user.user_metadata?.avatar_url || 'https://ui-avatars.com/api/?name='+name}" class="w-8 h-8 rounded-xl shadow-sm">
                     <span class="text-sm font-black text-gray-700 dark:text-gray-200 hidden lg:inline">${name}</span>
                 </div>
                 <button id="logout-btn" class="text-xs font-black text-gray-500 hover:text-red-500 transition-colors">로그아웃</button>
             </div>
-        ";
+        `;
         document.getElementById('logout-btn')?.addEventListener('click', async () => { 
             await sb.auth.signOut(); 
             updateAuthUI(); 
@@ -77,8 +77,8 @@ window.showStats = () => {
     allSetlists.forEach(s => artistCounts[s.artist] = (artistCounts[s.artist] || 0) + 1);
     const sorted = Object.entries(artistCounts).sort((a,b) => b[1] - a[1]);
     
-    list.innerHTML = "` +
-        `<div class="bg-white dark:bg-gray-900 p-10 rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-800">
+    list.innerHTML = `
+        <div class="bg-white dark:bg-gray-900 p-10 rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-800">
             <h3 class="text-3xl font-black mb-8 dark:text-white flex items-center gap-3"><i class="fas fa-crown text-yellow-500"></i> 아티스트 랭킹</h3>
             <div class="space-y-6">
                 ${sorted.map(([name, count], i) => `
@@ -208,8 +208,8 @@ window.handleDelete = async (id) => {
 window.startEdit = async () => {
     const { data } = await sb.from('setlists').select('*').eq('id', currentSetlistId).single();
     const content = document.getElementById('detail-content');
-    content.innerHTML = "` +
-        `<h3 class="text-3xl font-black mb-8 dark:text-white">선곡표 수정</h3>
+    content.innerHTML = `
+        <h3 class="text-3xl font-black mb-8 dark:text-white">선곡표 수정</h3>
         <form id="edit-form" class="space-y-6">
             <input type="text" name="artist" value="${data.artist}" required class="w-full px-5 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white">
             <input type="date" name="performance_date" value="${data.performance_date}" required class="w-full px-5 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white">
@@ -220,7 +220,7 @@ window.startEdit = async () => {
                 <button type="button" onclick="openDetail('${currentSetlistId}')" class="px-8 bg-gray-100 dark:bg-gray-800 dark:text-white py-5 rounded-2xl font-black">취소</button>
             </div>
         </form>
-    ";
+    `;
     document.getElementById('edit-form').onsubmit = async (e) => {
         e.preventDefault();
         const f = new FormData(e.target);
