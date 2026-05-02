@@ -20,8 +20,7 @@ const routes = {
 
 function navigateTo(page, id = null) {
     const hash = id ? `#/${page}/${id}` : `#/${page}`;
-    if (window.location.hash === hash) handleRouting(); // Force reload if same hash
-    else window.location.hash = hash;
+    window.location.hash = hash;
 }
 
 window.addEventListener('hashchange', handleRouting);
@@ -30,11 +29,8 @@ async function handleRouting() {
     const hash = window.location.hash || '#/home';
     const parts = hash.split('/');
     const page = parts[1] || 'home';
-    const id = parts.slice(2).join('/'); // Support IDs with colons like 'artist:Name'
+    const id = parts.slice(2).join('/');
 
-    console.log('Routing to:', page, 'ID:', id);
-
-    // UI Cleanup
     const hero = document.getElementById('home-hero');
     if (hero) hero.style.display = page === 'home' ? 'block' : 'none';
     
@@ -54,49 +50,57 @@ async function handleRouting() {
 // --- Page Renderers ---
 
 async function renderHomePage() {
-    const { data } = await sb.from('setlists').select('*').order('performance_date', { ascending: false }).limit(5);
-    allSetlists = data || [];
+    const today = new Date().toISOString().split('T')[0];
+    const { data: recent } = await sb.from('setlists').select('*').lte('performance_date', today).order('performance_date', { ascending: false }).limit(5);
+    const { data: upcoming } = await sb.from('setlists').select('*').gt('performance_date', today).order('performance_date', { ascending: true }).limit(3);
+    
+    allSetlists = recent || [];
     
     const routerContainer = document.getElementById('page-router');
     routerContainer.innerHTML = `
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-16">
-            <div class="lg:col-span-2">
-                <div class="flex items-center justify-between mb-12">
-                    <h2 class="text-4xl font-black text-gray-900 dark:text-white tracking-tight">최근 공연 선곡표</h2>
-                    <a href="#/setlists" class="text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-2 text-lg">전체 보기 <i class="fas fa-arrow-right text-sm"></i></a>
+            <div class="lg:col-span-2 space-y-16">
+                <div>
+                    <div class="flex items-center justify-between mb-10">
+                        <h2 class="text-3xl font-black text-gray-900 dark:text-white tracking-tight">최근 개최 공연</h2>
+                        <a href="#/setlists" class="text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-2">전체 보기 <i class="fas fa-arrow-right text-xs"></i></a>
+                    </div>
+                    <div class="space-y-6" id="recent-list"></div>
                 </div>
-                <div class="space-y-6" id="recent-list"></div>
+                <div>
+                    <div class="flex items-center justify-between mb-10">
+                        <h2 class="text-3xl font-black text-gray-900 dark:text-white tracking-tight">개최 예정 공연</h2>
+                    </div>
+                    <div class="space-y-6" id="upcoming-list"></div>
+                </div>
             </div>
             <div class="space-y-10">
-                <div class="bg-white dark:bg-gray-900 p-10 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-xl shadow-gray-200/50 dark:shadow-none">
+                <div class="bg-white dark:bg-gray-900 p-10 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-xl">
                     <h3 class="text-2xl font-black mb-8 dark:text-white tracking-tight">인기 아티스트</h3>
                     <ul class="space-y-6" id="trending-artists"></ul>
                 </div>
             </div>
         </div>
     `;
-    renderSetlistCards(allSetlists, 'recent-list');
+    renderSetlistCards(recent || [], 'recent-list');
+    renderSetlistCards(upcoming || [], 'upcoming-list', true);
     loadTrendingArtists();
 }
 
 async function renderSetlistsPage(filter = null) {
     let query = sb.from('setlists').select('*').order('performance_date', { ascending: false });
-    
     let title = '모든 선곡표';
+    
     if (filter) {
         const decoded = decodeURIComponent(filter);
-        const parts = decoded.split(':');
-        const type = parts[0];
-        const value = parts.slice(1).join(':');
-
+        const [type, value] = [decoded.split(':')[0], decoded.split(':').slice(1).join(':')];
         if (type === 'artist') { query = query.eq('artist', value); title = `${value} 선곡표`; }
         else if (type === 'venue') { query = query.eq('venue', value); title = `${value} 공연 기록`; }
         else if (type === 'category') { query = query.eq('category', value); title = value === 'Festival' ? '페스티벌 아카이브' : title; }
     }
 
     const { data } = await query;
-    const routerContainer = document.getElementById('page-router');
-    routerContainer.innerHTML = `
+    document.getElementById('page-router').innerHTML = `
         <div class="flex items-center gap-4 mb-12">
             ${filter ? `<button onclick="window.history.back()" class="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-indigo-600 transition-all"><i class="fas fa-arrow-left text-sm"></i></button>` : ''}
             <h2 class="text-4xl font-black dark:text-white">${title}</h2>
@@ -110,19 +114,16 @@ async function renderArtistsPage() {
     const { data } = await sb.from('setlists').select('artist');
     const counts = {};
     data.forEach(d => counts[d.artist] = (counts[d.artist] || 0) + 1);
-    const artists = Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0]));
+    const artists = Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0], 'ko'));
     
-    const routerContainer = document.getElementById('page-router');
-    routerContainer.innerHTML = `
-        <h2 class="text-4xl font-black mb-12 dark:text-white text-center md:text-left">아티스트 목록</h2>
+    document.getElementById('page-router').innerHTML = `
+        <h2 class="text-4xl font-black mb-12 dark:text-white">아티스트 목록</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             ${artists.map(([name, count]) => `
                 <div onclick="navigateTo('setlists', 'artist:${name}')" class="p-8 bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:border-indigo-500 cursor-pointer transition-all group text-center">
-                    <div class="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mx-auto mb-4 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                        <i class="fas fa-user-astronaut text-2xl"></i>
-                    </div>
+                    <div class="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl flex items-center justify-center text-indigo-600 mx-auto mb-4 group-hover:bg-indigo-600 group-hover:text-white transition-all"><i class="fas fa-microphone-alt text-2xl"></i></div>
                     <h3 class="text-xl font-black dark:text-white mb-1 group-hover:text-indigo-600 transition-colors">${name}</h3>
-                    <p class="text-sm text-gray-400 font-bold">${count}개의 선곡표</p>
+                    <p class="text-sm text-gray-400 font-bold">${count} 선곡표</p>
                 </div>
             `).join('')}
         </div>
@@ -131,25 +132,18 @@ async function renderArtistsPage() {
 
 async function renderFestivalsPage() {
     const { data } = await sb.from('setlists').select('*').eq('category', 'Festival').order('performance_date', { ascending: false });
-    const festivals = [...new Set(data.map(d => d.concert))].sort();
+    const festivals = [...new Set(data.map(d => d.concert))].sort((a, b) => a.localeCompare(b, 'ko'));
     
-    const routerContainer = document.getElementById('page-router');
-    routerContainer.innerHTML = `
+    document.getElementById('page-router').innerHTML = `
         <h2 class="text-4xl font-black mb-12 dark:text-white">페스티벌 아카이브</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             ${festivals.map(name => `
                 <div onclick="navigateTo('setlists', 'category:Festival')" class="p-8 bg-gradient-to-br from-purple-500/10 to-indigo-600/10 dark:from-purple-500/5 dark:to-indigo-600/5 rounded-[2.5rem] border border-indigo-100 dark:border-indigo-900/30 hover:border-indigo-500 cursor-pointer transition-all group">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h3 class="text-2xl font-black dark:text-white group-hover:text-indigo-600 transition-colors">${name}</h3>
-                            <p class="text-indigo-400 font-bold mt-1 uppercase tracking-widest text-xs">Festival Edition</p>
-                        </div>
-                        <i class="fas fa-republican text-3xl text-indigo-200 dark:text-indigo-800"></i>
-                    </div>
+                    <h3 class="text-2xl font-black dark:text-white group-hover:text-indigo-600 transition-colors">${name}</h3>
+                    <p class="text-indigo-400 font-bold mt-1 uppercase tracking-widest text-xs">Festival 아카이브 보기</p>
                 </div>
             `).join('')}
         </div>
-        ${festivals.length === 0 ? `<p class="text-center py-20 text-gray-400 font-bold">등록된 페스티벌이 없습니다.</p>` : ''}
     `;
 }
 
@@ -157,49 +151,39 @@ async function renderVenuesPage() {
     const { data } = await sb.from('setlists').select('venue, location');
     const uniqueVenues = [];
     const seen = new Set();
-    data.forEach(d => {
-        if (d.venue && !seen.has(d.venue)) {
-            seen.add(d.venue);
-            uniqueVenues.push(d);
-        }
-    });
+    data.forEach(d => { if (d.venue && !seen.has(d.venue)) { seen.add(d.venue); uniqueVenues.push(d); } });
     
-    const routerContainer = document.getElementById('page-router');
-    routerContainer.innerHTML = `
+    document.getElementById('page-router').innerHTML = `
         <h2 class="text-4xl font-black mb-12 dark:text-white">공연장 정보</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             ${uniqueVenues.map(v => `
                 <div onclick="navigateTo('setlists', 'venue:${v.venue}')" class="p-8 bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:border-indigo-500 cursor-pointer transition-all group">
-                    <div class="w-12 h-12 bg-gray-50 dark:bg-gray-800 rounded-xl flex items-center justify-center text-gray-400 group-hover:bg-indigo-600 group-hover:text-white transition-all mb-4">
-                        <i class="fas fa-map-marked-alt text-xl"></i>
-                    </div>
+                    <div class="w-12 h-12 bg-gray-50 dark:bg-gray-800 rounded-xl flex items-center justify-center text-gray-400 group-hover:bg-indigo-600 group-hover:text-white transition-all mb-4"><i class="fas fa-map-marker-alt text-xl"></i></div>
                     <h3 class="text-xl font-black dark:text-white mb-1 group-hover:text-indigo-600 transition-colors">${v.venue}</h3>
                     <p class="text-sm text-gray-400 font-medium">${v.location || ''}</p>
                 </div>
             `).join('')}
         </div>
-        ${uniqueVenues.length === 0 ? `<p class="text-center py-20 text-gray-400 font-bold">등록된 공연장이 없습니다.</p>` : ''}
     `;
 }
 
 async function renderStatsPage() {
-    const { data } = await sb.from('setlists').select('*');
-    const artistCounts = {};
-    data.forEach(s => artistCounts[s.artist] = (artistCounts[s.artist] || 0) + 1);
-    const sorted = Object.entries(artistCounts).sort((a,b) => b[1] - a[1]);
+    const { data } = await sb.from('setlists').select('artist');
+    const counts = {};
+    data.forEach(s => counts[s.artist] = (counts[s.artist] || 0) + 1);
+    const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]);
     
-    const routerContainer = document.getElementById('page-router');
-    routerContainer.innerHTML = `
+    document.getElementById('page-router').innerHTML = `
         <div class="bg-white dark:bg-gray-900 p-10 rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-800">
             <h3 class="text-3xl font-black mb-8 dark:text-white flex items-center gap-3"><i class="fas fa-crown text-yellow-500"></i> 아티스트 랭킹</h3>
             <div class="space-y-6">
                 ${sorted.map(([name, count], i) => `
-                    <div class="flex items-center justify-between p-6 bg-gray-50 dark:bg-gray-800 rounded-[2rem] group hover:bg-indigo-600 transition-all">
+                    <div class="flex items-center justify-between p-6 bg-gray-50 dark:bg-gray-800 rounded-[2rem] group hover:bg-indigo-600 transition-all cursor-pointer" onclick="navigateTo('setlists', 'artist:${name}')">
                         <div class="flex items-center gap-6">
                             <span class="text-3xl font-black ${i<3 ? 'text-indigo-500 group-hover:text-white' : 'text-gray-300'}">${i+1}</span>
                             <span class="text-xl font-bold dark:text-white group-hover:text-white">${name}</span>
                         </div>
-                        <span class="px-6 py-2 bg-white dark:bg-gray-700 rounded-full text-indigo-600 dark:text-indigo-400 font-black shadow-sm">${count} 선곡표</span>
+                        <span class="px-6 py-2 bg-white dark:bg-gray-700 rounded-full text-indigo-600 font-black shadow-sm">${count} 선곡표</span>
                     </div>
                 `).join('')}
             </div>
@@ -209,82 +193,64 @@ async function renderStatsPage() {
 async function renderSetlistDetailPage(id) {
     const { data } = await sb.from('setlists').select('*').eq('id', id).single();
     if (!data) return navigateTo('home');
-    
     const { count: likeCount } = await sb.from('likes').select('*', { count: 'exact', head: true }).eq('setlist_id', id);
     const { data: comments } = await sb.from('comments').select('*').eq('setlist_id', id).order('created_at', { ascending: true });
     
-    const routerContainer = document.getElementById('page-router');
-    routerContainer.innerHTML = `<div id="detail-full-view"></div>`;
+    document.getElementById('page-router').innerHTML = `<div id="detail-full-view"></div>`;
     renderDetailView(data, likeCount || 0, comments || [], 'detail-full-view');
 }
 
 async function renderProfilePage() {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return navigateTo('home');
-    
     const nickname = session.user.user_metadata?.display_name || session.user.email.split('@')[0];
     
-    const routerContainer = document.getElementById('page-router');
-    routerContainer.innerHTML = `
+    document.getElementById('page-router').innerHTML = `
         <div class="max-w-2xl mx-auto bg-white dark:bg-gray-900 p-10 rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-800">
             <h2 class="text-4xl font-black mb-8 dark:text-white text-center">개인 정보 설정</h2>
             <form id="profile-form" class="space-y-6">
-                <div>
-                    <label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">이메일 계정</label>
-                    <input type="text" value="${session.user.email}" disabled class="w-full px-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-800 text-gray-400 border-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">활동 닉네임</label>
-                    <input type="text" id="profile-nickname" value="${nickname}" required class="w-full px-6 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none transition-all">
-                </div>
+                <div><label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">이메일 계정</label><input type="text" value="${session.user.email}" disabled class="w-full px-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-800 text-gray-400 border-none"></div>
+                <div><label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">활동 닉네임</label><input type="text" id="profile-nickname" value="${nickname}" required class="w-full px-6 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-600 outline-none transition-all"></div>
                 <button type="submit" class="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-xl hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-500/20">저장하기</button>
             </form>
-        </div>
-    `;
-    
+        </div>`;
     document.getElementById('profile-form').onsubmit = async (e) => {
         e.preventDefault();
         const newNickname = document.getElementById('profile-nickname').value;
         const { error } = await sb.auth.updateUser({ data: { display_name: newNickname } });
-        if (error) alert('수정 중 오류가 발생했습니다.');
-        else { alert('닉네임이 성공적으로 변경되었습니다!'); updateAuthUI(); }
+        if (error) alert('수정 중 오류가 발생했습니다.'); else { alert('닉네임이 성공적으로 변경되었습니다!'); updateAuthUI(); }
     };
 }
 
 async function renderMyAttendancePage() {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return navigateTo('home');
-    
-    // We use 'likes' table as a proxy for 'attendance' for now
     const { data: attended } = await sb.from('likes').select('setlist_id').eq('user_id', session.user.id);
     const setlistIds = attended.map(a => a.setlist_id);
-    
     const { data: setlists } = await sb.from('setlists').select('*').in('id', setlistIds).order('performance_date', { ascending: false });
     
-    const routerContainer = document.getElementById('page-router');
-    routerContainer.innerHTML = `
+    document.getElementById('page-router').innerHTML = `
         <h2 class="text-4xl font-black mb-12 dark:text-white">내가 다녀온 공연</h2>
         <div class="space-y-6" id="my-attended-list"></div>
-        ${setlists?.length === 0 ? `<div class="text-center py-20 text-gray-400 font-bold">아직 관람 완료로 표시한 공연이 없습니다.</div>` : ''}
-    `;
+        ${setlists?.length === 0 ? `<div class="text-center py-20 text-gray-400 font-bold">아직 관람 완료로 표시한 공연이 없습니다.</div>` : ''}`;
     renderSetlistCards(setlists || [], 'my-attended-list');
 }
 
 // --- Component Renderers ---
 
-function renderSetlistCards(data, targetId) {
+function renderSetlistCards(data, targetId, isUpcoming = false) {
     const list = document.getElementById(targetId);
     if (!list) return;
-    if (!data?.length) { list.innerHTML = `<div class="text-center py-20 bg-white dark:bg-gray-900 rounded-[2.5rem] border-2 border-dashed border-gray-100 dark:border-gray-800 text-gray-400 font-bold">내용이 없습니다.</div>`; return; }
+    if (!data?.length) { list.innerHTML = `<div class="text-center py-10 bg-white dark:bg-gray-900 rounded-[2.5rem] border-2 border-dashed border-gray-100 dark:border-gray-800 text-gray-400 font-bold">내용이 없습니다.</div>`; return; }
     list.innerHTML = data.map(item => `
         <div onclick="navigateTo('setlist', '${item.id}')" class="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-8 group hover:-translate-y-2 relative overflow-hidden">
             <div class="flex items-center space-x-8">
-                <div class="bg-indigo-50 dark:bg-indigo-900/20 w-20 h-20 rounded-[1.5rem] flex items-center justify-center text-indigo-600 dark:text-indigo-400 flex-shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner">
+                <div class="bg-indigo-50 dark:bg-indigo-900/20 w-20 h-20 rounded-[1.5rem] flex items-center justify-center text-indigo-600 flex-shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner">
                     ${item.image_url ? `<img src="${item.image_url}" class="w-full h-full object-cover rounded-[1.5rem]">` : `<i class="fas fa-microphone-alt text-3xl"></i>`}
                 </div>
                 <div>
                     <div class="flex items-center gap-2 mb-1">
-                        <span class="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-md">${item.category || 'Concert'}</span>
+                        <span class="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 ${isUpcoming ? 'bg-orange-100 text-orange-600' : 'bg-indigo-100 text-indigo-600'} rounded-md">${isUpcoming ? 'Upcoming' : (item.category || 'Concert')}</span>
                     </div>
                     <h3 class="font-black text-2xl dark:text-white group-hover:text-indigo-600 transition-colors tracking-tight">${item.artist}</h3>
                     <p class="text-lg text-gray-500 dark:text-gray-400 font-bold">${item.concert}</p>
@@ -294,8 +260,7 @@ function renderSetlistCards(data, targetId) {
                 <span class="text-xl font-black dark:text-gray-200">${item.performance_date}</span>
                 <span class="text-xs font-black text-gray-400 mt-2 tracking-widest bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-full">${item.venue || ''}</span>
             </div>
-        </div>
-    `).join('');
+        </div>`).join('');
 }
 
 async function loadTrendingArtists() {
@@ -303,7 +268,6 @@ async function loadTrendingArtists() {
     const counts = {};
     data.forEach(d => counts[d.artist] = (counts[d.artist] || 0) + 1);
     const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 5);
-    
     const container = document.getElementById('trending-artists');
     if (container) {
         container.innerHTML = sorted.map(([name, count], i) => `
@@ -313,36 +277,24 @@ async function loadTrendingArtists() {
                     <span class="font-bold text-gray-800 dark:text-gray-200 text-lg group-hover:text-indigo-600 transition-colors">${name}</span>
                 </div>
                 <span class="text-sm text-gray-400 font-bold">${count} 선곡표</span>
-            </li>
-        `).join('');
+            </li>`).join('');
     }
 }
-
-// --- Detail View Renderer ---
 
 async function renderDetailView(data, likeCount, comments, targetId) {
     const { data: { session } } = await sb.auth.getSession();
     const container = document.getElementById(targetId);
-    
-    let sets = [];
-    let currentSetName = 'Main Set';
-    let currentSongs = [];
-
+    let sets = []; let currentSetName = 'Main Set'; let currentSongs = [];
     if (data.songs && data.songs.length > 0) {
         data.songs.forEach(songText => {
             const trimmed = songText.trim();
             if (trimmed.startsWith('---') && trimmed.endsWith('---')) {
                 if (currentSongs.length > 0) sets.push({ name: currentSetName, songs: currentSongs });
-                currentSetName = trimmed.replace(/-/g, '').trim();
-                currentSongs = [];
+                currentSetName = trimmed.replace(/-/g, '').trim(); currentSongs = [];
             } else {
-                let title = trimmed;
-                let note = '';
-                let cover = '';
-                const noteMatch = title.match(/\[(.*?)\]/);
-                if (noteMatch) { note = noteMatch[1]; title = title.replace(/\[.*?\]/, '').trim(); }
-                const coverMatch = title.match(/\((.*?) cover\)/i);
-                if (coverMatch) { cover = coverMatch[1]; title = title.replace(/\(.*?\)/, '').trim(); }
+                let title = trimmed; let note = ''; let cover = '';
+                const noteMatch = title.match(/\[(.*?)\]/); if (noteMatch) { note = noteMatch[1]; title = title.replace(/\[.*?\]/, '').trim(); }
+                const coverMatch = title.match(/\((.*?) cover\)/i); if (coverMatch) { cover = coverMatch[1]; title = title.replace(/\(.*?\)/, '').trim(); }
                 currentSongs.push({ title, note, cover });
             }
         });
@@ -360,26 +312,20 @@ async function renderDetailView(data, likeCount, comments, targetId) {
                             <div class="flex items-center gap-3 flex-wrap">
                                 <span class="text-lg font-bold dark:text-gray-200">${s.title}</span>
                                 ${s.cover ? `<span class="text-sm text-gray-400 italic font-medium">(${s.cover} 커버)</span>` : ''}
-                                <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(data.artist + ' ' + s.title)}&sp=EgIQAQ%253D%253D" target="_blank" class="text-red-500 hover:text-red-600 transition-colors text-lg opacity-0 group-hover:opacity-100"><i class="fab fa-youtube"></i></a>
+                                <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(data.artist + ' ' + s.title + ' Official Music Video')}" target="_blank" class="text-red-500 hover:text-red-600 transition-colors text-lg opacity-0 group-hover:opacity-100"><i class="fab fa-youtube"></i></a>
                             </div>
                             ${s.note ? `<p class="text-xs text-indigo-400 font-bold mt-1"><i class="fas fa-info-circle mr-1"></i>${s.note}</p>` : ''}
                         </div>
-                    </div>
-                `).join('')}
+                    </div>`).join('')}
             </div>
-        </div>
-    `).join('');
+        </div>`).join('');
 
     container.innerHTML = `
         <div class="flex flex-col sm:flex-row justify-between items-start gap-6 mb-12">
             <div class="flex items-center gap-4">
                 <button onclick="window.history.back()" class="w-12 h-12 flex items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-indigo-600 transition-all"><i class="fas fa-arrow-left"></i></button>
                 <div>
-                    <nav class="flex text-xs font-black text-gray-400 uppercase tracking-widest mb-1">
-                        <span onclick="navigateTo('setlists')" class="hover:text-indigo-500 cursor-pointer">세트리스트</span>
-                        <span class="mx-2">/</span>
-                        <span class="text-indigo-500">${data.artist}</span>
-                    </nav>
+                    <nav class="flex text-xs font-black text-gray-400 uppercase tracking-widest mb-1"><span onclick="navigateTo('setlists')" class="hover:text-indigo-500 cursor-pointer">세트리스트</span><span class="mx-2">/</span><span class="text-indigo-500">${data.artist}</span></nav>
                     <h2 class="text-4xl font-black dark:text-white tracking-tighter">${data.artist} <span class="text-indigo-500 font-light ml-2">세트리스트</span></h2>
                 </div>
             </div>
@@ -388,70 +334,29 @@ async function renderDetailView(data, likeCount, comments, targetId) {
                 <button onclick="handleLike('${data.id}')" class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20"><i class="fas fa-check-circle"></i> 공연 관람 완료</button>
                 ${session && (session.user.id === data.user_id) ? `
                     <button onclick="startEdit('${data.id}')" class="p-3 bg-gray-100 dark:bg-gray-800 rounded-2xl text-gray-500 hover:text-indigo-600 transition-all"><i class="fas fa-edit"></i></button>
-                    <button onclick="handleDelete('${data.id}')" class="p-3 bg-red-50 dark:bg-red-900/20 text-red-400 hover:bg-red-500 hover:text-white rounded-2xl transition-all"><i class="fas fa-trash-alt"></i></button>
-                ` : ''}
+                    <button onclick="handleDelete('${data.id}')" class="p-3 bg-red-50 dark:bg-red-900/20 text-red-400 hover:bg-red-500 hover:text-white rounded-2xl transition-all"><i class="fas fa-trash-alt"></i></button>` : ''}
             </div>
         </div>
-
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
             <div class="lg:col-span-8">
                 <div class="bg-gray-50/50 dark:bg-gray-800/30 rounded-[2.5rem] p-8 sm:p-10 border border-gray-100 dark:border-gray-800">
                     <div class="flex flex-col md:flex-row gap-8 mb-12">
                         ${data.image_url ? `<div class="w-full md:w-48 h-64 rounded-3xl overflow-hidden shadow-xl flex-shrink-0"><img src="${data.image_url}" class="w-full h-full object-cover"></div>` : ''}
-                        <div class="flex-1">
-                            <div class="space-y-4">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-xl bg-white dark:bg-gray-900 flex items-center justify-center text-indigo-500 shadow-sm border border-gray-100 dark:border-gray-800"><i class="fas fa-calendar"></i></div>
-                                    <div>
-                                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">공연 날짜</p>
-                                        <p class="font-bold dark:text-white">${new Date(data.performance_date).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-xl bg-white dark:bg-gray-900 flex items-center justify-center text-purple-500 shadow-sm border border-gray-100 dark:border-gray-800"><i class="fas fa-map-marker-alt"></i></div>
-                                    <div>
-                                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">공연장 및 위치</p>
-                                        <p class="font-bold dark:text-white">${data.venue}, ${data.location || '정보 없음'}</p>
-                                    </div>
-                                </div>
-                                ${data.concert ? `
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-xl bg-white dark:bg-gray-900 flex items-center justify-center text-orange-500 shadow-sm border border-gray-100 dark:border-gray-800"><i class="fas fa-ticket-alt"></i></div>
-                                    <div>
-                                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">투어</p>
-                                        <p class="font-bold dark:text-white">${data.concert}</p>
-                                    </div>
-                                </div>` : ''}
-                            </div>
-                        </div>
+                        <div class="flex-1"><div class="space-y-4"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-xl bg-white dark:bg-gray-900 flex items-center justify-center text-indigo-500 shadow-sm border border-gray-100 dark:border-gray-800"><i class="fas fa-calendar"></i></div><div><p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">공연 날짜</p><p class="font-bold dark:text-white">${new Date(data.performance_date).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p></div></div><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-xl bg-white dark:bg-gray-900 flex items-center justify-center text-purple-500 shadow-sm border border-gray-100 dark:border-gray-800"><i class="fas fa-map-marker-alt"></i></div><div><p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">공연장 및 위치</p><p class="font-bold dark:text-white">${data.venue}, ${data.location || '정보 없음'}</p></div></div>${data.concert ? `<div class="flex items-center gap-3"><div class="w-10 h-10 rounded-xl bg-white dark:bg-gray-900 flex items-center justify-center text-orange-500 shadow-sm border border-gray-100 dark:border-gray-800"><i class="fas fa-ticket-alt"></i></div><div><p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">투어</p><p class="font-bold dark:text-white">${data.concert}</p></div></div>` : ''}</div></div>
                     </div>
-                    <div class="bg-white dark:bg-gray-900 rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100 dark:border-gray-800">
-                        ${setsHtml || `<p class="text-center py-10 text-gray-400 font-medium">등록된 곡이 없습니다.</p>`}
-                    </div>
+                    <div class="bg-white dark:bg-gray-900 rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100 dark:border-gray-800">${setsHtml || `<p class="text-center py-10 text-gray-400 font-medium">등록된 곡이 없습니다.</p>`}</div>
                 </div>
             </div>
             <div class="lg:col-span-4 space-y-8">
                 <div>
                     <h3 class="text-lg font-black dark:text-white mb-6 flex items-center gap-2"><i class="fas fa-comments text-indigo-500"></i> 팬 후기</h3>
                     <div class="space-y-4 mb-6" id="comments-container">
-                        ${comments.map(c => `
-                            <div class="p-5 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800 group relative">
-                                <div class="flex justify-between items-center mb-2">
-                                    <span class="text-xs font-black text-indigo-500">${c.display_name || c.user_email.split('@')[0]}</span>
-                                    <span class="text-[10px] text-gray-400">${new Date(c.created_at).toLocaleDateString()}</span>
-                                </div>
-                                <p class="text-sm dark:text-gray-300 leading-relaxed">${c.content}</p>
-                                ${session && session.user.id === c.user_id ? `
-                                    <button onclick="handleDeleteComment('${c.id}', '${data.id}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><i class="fas fa-trash-alt text-xs"></i></button>
-                                ` : ''}
-                            </div>
-                        `).join('')}
+                        ${comments.map(c => `<div class="p-5 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800 group relative"><div class="flex justify-between items-center mb-2"><span class="text-xs font-black text-indigo-500">${c.display_name || '익명'}</span><span class="text-[10px] text-gray-400">${new Date(c.created_at).toLocaleDateString()}</span></div><p class="text-sm dark:text-gray-300 leading-relaxed">${c.content}</p>${session && session.user.id === c.user_id ? `<button onclick="handleDeleteComment('${c.id}', '${data.id}')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><i class="fas fa-trash-alt text-xs"></i></button>` : ''}</div>`).join('')}
                     </div>
                     ${session ? `<div class="flex flex-col gap-2"><textarea id="comm-input" placeholder="공연의 감동을 공유해보세요..." class="w-full px-5 py-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none text-sm" rows="3"></textarea><button onclick="postComment('${data.id}')" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 active:scale-[0.98] transition-all">후기 등록</button></div>` : ''}
                 </div>
             </div>
-        </div>
-    `;
+        </div>`;
 }
 
 // --- Utils & Handlers ---
@@ -477,12 +382,7 @@ async function updateAuthUI() {
     }
 }
 
-window.handleDeleteComment = async (commentId, setlistId) => {
-    if (!confirm('후기를 삭제하시겠습니까?')) return;
-    await sb.from('comments').delete().eq('id', commentId);
-    renderSetlistDetailPage(setlistId);
-}
-
+window.handleDeleteComment = async (commentId, setlistId) => { if (!confirm('후기를 삭제하시겠습니까?')) return; await sb.from('comments').delete().eq('id', commentId); renderSetlistDetailPage(setlistId); }
 window.toggleModal = (s) => { document.getElementById('add-modal').classList.toggle('hidden', !s); document.body.style.overflow = s ? 'hidden' : 'auto'; }
 window.toggleAuthModal = (s) => { document.getElementById('auth-modal').classList.toggle('hidden', !s); document.body.style.overflow = s ? 'hidden' : 'auto'; }
 window.handleSocialLogin = async (p) => { await sb.auth.signInWithOAuth({ provider: p, options: { redirectTo: window.location.origin } }); }
@@ -504,27 +404,20 @@ window.handleLike = async (id) => {
 }
 
 window.postComment = async (id) => {
-    const input = document.getElementById('comm-input');
-    const content = input.value.trim();
-    if (!content) return;
+    const input = document.getElementById('comm-input'); const content = input.value.trim(); if (!content) return;
     const { data: { session } } = await sb.auth.getSession();
     const nickname = session.user.user_metadata?.display_name || session.user.email.split('@')[0];
-    await sb.from('comments').insert({ setlist_id: id, user_id: session.user.id, user_email: session.user.email, display_name: nickname, content: content });
-    input.value = ''; renderSetlistDetailPage(id);
+    const { error } = await sb.from('comments').insert({ setlist_id: id, user_id: session.user.id, user_email: session.user.email, display_name: nickname, content: content });
+    if (error) alert('등록 중 오류가 발생했습니다.'); else { input.value = ''; renderSetlistDetailPage(id); }
 }
 
-window.handleDelete = async (id) => {
-    if (!confirm('정말로 삭제하시겠습니까?')) return;
-    await sb.from('setlists').delete().match({ id });
-    navigateTo('home');
-}
+window.handleDelete = async (id) => { if (!confirm('정말로 삭제하시겠습니까?')) return; await sb.from('setlists').delete().match({ id }); navigateTo('home'); }
 
 window.startEdit = async (id) => {
     const { data } = await sb.from('setlists').select('*').eq('id', id).single();
-    const container = document.getElementById('page-router');
-    container.innerHTML = `
+    document.getElementById('page-router').innerHTML = `
         <h3 class="text-3xl font-black mb-8 dark:text-white">선곡표 수정</h3>
-        <form id="edit-form" class="space-y-6 max-w-2xl mx-auto bg-white dark:bg-gray-900 p-10 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-gray-800">
+        <form id="edit-form" class="space-y-6 max-w-2xl mx-auto bg-white dark:bg-gray-900 p-10 rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-800">
             <input type="text" name="artist" value="${data.artist}" required class="w-full px-5 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white" placeholder="아티스트 명">
             <input type="date" name="performance_date" value="${data.performance_date}" required class="w-full px-5 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white">
             <input type="text" name="concert" value="${data.concert}" required class="w-full px-5 py-4 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 dark:text-white" placeholder="공연 명">
@@ -535,55 +428,32 @@ window.startEdit = async (id) => {
             </div>
         </form>`;
     document.getElementById('edit-form').onsubmit = async (e) => {
-        e.preventDefault();
-        const f = new FormData(e.target);
-        await sb.from('setlists').update({
-            artist: f.get('artist'), performance_date: f.get('performance_date'), concert: f.get('concert'),
-            songs: f.get('songs_text').split('\n').map(s => s.trim()).filter(s => s)
-        }).eq('id', id);
+        e.preventDefault(); const f = new FormData(e.target);
+        await sb.from('setlists').update({ artist: f.get('artist'), performance_date: f.get('performance_date'), concert: f.get('concert'), songs: f.get('songs_text').split('\n').map(s => s.trim()).filter(s => s) }).eq('id', id);
         navigateTo('setlist', id);
     };
 }
 
-// --- Data Seeding (2026 Sample Data) ---
+// --- Data Seeding ---
 async function seed2026Data() {
     const { count } = await sb.from('setlists').select('*', { count: 'exact', head: true });
-    if (count > 10) return; // Skip if already has data
-    
+    if (count > 5) return;
     const samples = [
-        { artist: 'BTS', performance_date: '2026-06-12', concert: "BTS WORLD TOUR 'ARIRANG'", venue: '부산 아시아드 주경기장', location: '부산, 대한민국', category: 'Concert', songs: ['Dynamite', 'Butter', 'Arirang (Special Remix)', '--- Encore ---', 'Yet To Come'] },
-        { artist: '서울재즈페스티벌', performance_date: '2026-05-22', concert: '서울재즈페스티벌 2026', venue: '올림픽공원 88잔디마당', location: '서울, 대한민국', category: 'Festival', songs: ['Jazz Intro', 'Summertime', 'Blue in Green'] },
-        { artist: '포스트 말론', performance_date: '2026-09-20', concert: 'Live in Seoul', venue: '고양 종합운동장', location: '고양, 대한민국', category: 'Concert', songs: ['Circles', 'Sunflower', 'Rockstar'] }
+        { artist: '아이유', performance_date: '2024-03-02', concert: 'H.E.R. World Tour', venue: 'KSPO DOME', location: '서울, 대한민국', category: 'Concert', songs: ['홀씨', '잼잼', 'Ah puh', '--- Encore ---', '밤편지'] },
+        { artist: 'NELL', performance_date: '2024-04-12', concert: 'NELL’S ROOM 2024', venue: '잠실학생체육관', location: '서울, 대한민국', category: 'Concert', songs: ['Stay', '기억을 걷는 시간', '멀어지다'] },
+        { artist: 'DAY6', performance_date: '2024-04-14', concert: 'Welcome to the Show', venue: '잠실실내체육관', location: '서울, 대한민국', category: 'Concert', songs: ['Welcome to the Show', '한 페이지가 될 수 있게', '예뻤어'] }
     ];
     await sb.from('setlists').insert(samples);
 }
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    updateAuthUI();
-    handleRouting();
-    seed2026Data();
+    updateAuthUI(); handleRouting(); seed2026Data();
     document.getElementById('setlist-form')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const { data: { session } } = await sb.auth.getSession();
-        if (!session) return alert('로그인이 필요합니다.');
-        const f = new FormData(e.target);
-        const imgInput = document.getElementById('image-upload');
-        let imageUrl = null;
-        if (imgInput?.files?.[0]) {
-            const file = imgInput.files[0];
-            const fileName = `${Date.now()}_${file.name}`;
-            const { error: uploadError } = await sb.storage.from('posters').upload(fileName, file);
-            if (!uploadError) imageUrl = sb.storage.from('posters').getPublicUrl(fileName).data.publicUrl;
-        }
-        const d = {
-            artist: f.get('artist'), performance_date: f.get('performance_date'), concert: f.get('concert'),
-            venue: f.get('venue'), location: f.get('location'), category: f.get('category'), image_url: imageUrl,
-            songs: f.get('songs_text').split('\n').map(s => s.trim().replace(/^\d+\.\s*/, '')).filter(s => s),
-            user_id: session.user.id
-        };
-        const { data: inserted } = await sb.from('setlists').insert([d]).select();
-        toggleModal(false);
-        if (inserted?.[0]) navigateTo('setlist', inserted[0].id);
+        e.preventDefault(); const { data: { session } } = await sb.auth.getSession(); if (!session) return alert('로그인이 필요합니다.');
+        const f = new FormData(e.target); const imgInput = document.getElementById('image-upload'); let imageUrl = null;
+        if (imgInput?.files?.[0]) { const file = imgInput.files[0]; const fileName = `${Date.now()}_${file.name}`; const { error: uploadError } = await sb.storage.from('posters').upload(fileName, file); if (!uploadError) imageUrl = sb.storage.from('posters').getPublicUrl(fileName).data.publicUrl; }
+        const d = { artist: f.get('artist'), performance_date: f.get('performance_date'), concert: f.get('concert'), venue: f.get('venue'), location: f.get('location'), category: f.get('category'), image_url: imageUrl, songs: f.get('songs_text').split('\n').map(s => s.trim().replace(/^\d+\.\s*/, '')).filter(s => s), user_id: session.user.id };
+        const { data: inserted } = await sb.from('setlists').insert([d]).select(); toggleModal(false); if (inserted?.[0]) navigateTo('setlist', inserted[0].id);
     });
 });
