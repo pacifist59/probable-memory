@@ -146,40 +146,156 @@ async function renderDetailView(data, likeCount, comments) {
     const { data: { session } } = await sb.auth.getSession();
     const content = document.getElementById('detail-content');
     
-    const songsHtml = data.songs?.length 
-        ? data.songs.map((s, i) => `<div class="flex items-center gap-6 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group"><span class="text-2xl font-black text-indigo-200 dark:text-gray-700 group-hover:text-indigo-500">${String(i + 1).padStart(2, '0')}</span><span class="text-lg font-bold dark:text-gray-200">${s}</span></div>`).join('')
-        : `<p class="text-gray-400 font-bold py-10 text-center">곡 목록이 없습니다.</p>`;
+    // Parse songs for setlist.fm features
+    let currentSetHtml = '';
+    let sets = [];
+    let currentSetName = 'Main Set';
+    let currentSongs = [];
+
+    if (data.songs && data.songs.length > 0) {
+        data.songs.forEach(songText => {
+            const trimmed = songText.trim();
+            if (trimmed.startsWith('---') && trimmed.endsWith('---')) {
+                if (currentSongs.length > 0) sets.push({ name: currentSetName, songs: currentSongs });
+                currentSetName = trimmed.replace(/-/g, '').trim();
+                currentSongs = [];
+            } else {
+                // Parse "Song Title (Artist cover) [Note]"
+                let title = trimmed;
+                let note = '';
+                let cover = '';
+
+                const noteMatch = title.match(/\[(.*?)\]/);
+                if (noteMatch) {
+                    note = noteMatch[1];
+                    title = title.replace(/\[.*?\]/, '').trim();
+                }
+
+                const coverMatch = title.match(/\((.*?) cover\)/i);
+                if (coverMatch) {
+                    cover = coverMatch[1];
+                    title = title.replace(/\(.*?\)/, '').trim();
+                }
+
+                currentSongs.push({ title, note, cover });
+            }
+        });
+        if (currentSongs.length > 0) sets.push({ name: currentSetName, songs: currentSongs });
+    }
+
+    const setsHtml = sets.map(set => `
+        <div class="mb-8">
+            <h4 class="text-xs font-black text-indigo-500 uppercase tracking-[0.2em] mb-4 border-b border-gray-100 dark:border-gray-800 pb-2">${set.name}</h4>
+            <div class="space-y-1">
+                ${set.songs.map((s, i) => `
+                    <div class="flex items-start gap-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group">
+                        <span class="text-sm font-black text-gray-300 dark:text-gray-700 mt-1">${i + 1}</span>
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-lg font-bold dark:text-gray-200">${s.title}</span>
+                                ${s.cover ? `<span class="text-sm text-gray-400 italic font-medium">(${s.cover} cover)</span>` : ''}
+                            </div>
+                            ${s.note ? `<p class="text-xs text-indigo-400 font-bold mt-1"><i class="fas fa-info-circle mr-1"></i>${s.note}</p>` : ''}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `).join('');
 
     content.innerHTML = `
-        <div class="flex justify-between items-start mb-10">
-            <button onclick="toggleDetailModal(false)" class="text-gray-400 hover:text-white transition-colors text-2xl"><i class="fas fa-arrow-left"></i></button>
-            <div class="flex gap-3">
-                <button onclick="handleLike('${data.id}')" class="flex items-center gap-2 px-6 py-2 bg-pink-50 dark:bg-pink-900/20 text-pink-500 rounded-xl font-black text-sm hover:bg-pink-500 hover:text-white transition-all"><i class="fas fa-heart"></i> ${likeCount}</button>
-                ${session ? `<button onclick="startEdit()" class="px-6 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl font-black text-sm hover:bg-indigo-600 hover:text-white transition-all">수정</button>
-                <button onclick="handleDelete('${data.id}')" class="w-10 h-10 bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-600 hover:text-white rounded-xl flex items-center justify-center transition-all"><i class="fas fa-trash-alt"></i></button>` : ''}
+        <div class="flex flex-col sm:flex-row justify-between items-start gap-6 mb-12">
+            <div class="flex items-center gap-4">
+                <button onclick="toggleDetailModal(false)" class="w-12 h-12 flex items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-indigo-600 transition-all"><i class="fas fa-arrow-left"></i></button>
+                <div>
+                    <nav class="flex text-xs font-black text-gray-400 uppercase tracking-widest mb-1">
+                        <span class="hover:text-indigo-500 cursor-pointer">Setlists</span>
+                        <span class="mx-2">/</span>
+                        <span class="text-indigo-500">${data.artist}</span>
+                    </nav>
+                    <h2 class="text-4xl font-black dark:text-white tracking-tighter">${data.artist} <span class="text-indigo-500 font-light ml-2">Setlist</span></h2>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+                <button onclick="handleLike('${data.id}')" class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-pink-50 dark:bg-pink-900/20 text-pink-500 rounded-2xl font-black text-sm hover:bg-pink-500 hover:text-white transition-all shadow-sm"><i class="fas fa-heart"></i> ${likeCount}</button>
+                <button class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20"><i class="fas fa-check-circle"></i> I was there</button>
+                ${session ? `
+                    <button onclick="startEdit()" class="p-3 bg-gray-100 dark:bg-gray-800 rounded-2xl text-gray-500 hover:text-indigo-600 transition-all"><i class="fas fa-edit"></i></button>
+                    <button onclick="handleDelete('${data.id}')" class="p-3 bg-red-50 dark:bg-red-900/20 text-red-400 hover:bg-red-500 hover:text-white rounded-2xl transition-all"><i class="fas fa-trash-alt"></i></button>
+                ` : ''}
             </div>
         </div>
-        ${data.image_url ? `<img src="${data.image_url}" class="w-full h-64 object-cover rounded-[2rem] mb-10 shadow-2xl">` : ''}
-        <div class="mb-12">
-            <h2 class="text-5xl font-black dark:text-white tracking-tighter mb-4">${data.artist}</h2>
-            <p class="text-2xl font-bold text-gray-500 dark:text-gray-400 mb-6">${data.concert}</p>
-            <div class="flex flex-wrap gap-4">
-                <span class="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-5 py-2 rounded-full font-black text-sm"><i class="fas fa-calendar mr-2"></i> ${data.performance_date}</span>
-                <span class="bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-5 py-2 rounded-full font-black text-sm"><i class="fas fa-map-marker-alt mr-2 text-indigo-500"></i> ${data.venue}</span>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            <div class="lg:col-span-8">
+                <div class="bg-gray-50/50 dark:bg-gray-800/30 rounded-[2.5rem] p-8 sm:p-10 border border-gray-100 dark:border-gray-800">
+                    <div class="flex flex-col md:flex-row gap-8 mb-12">
+                        ${data.image_url ? `<div class="w-full md:w-48 h-64 rounded-3xl overflow-hidden shadow-xl flex-shrink-0"><img src="${data.image_url}" class="w-full h-full object-cover"></div>` : ''}
+                        <div class="flex-1">
+                            <div class="space-y-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-white dark:bg-gray-900 flex items-center justify-center text-indigo-500 shadow-sm border border-gray-100 dark:border-gray-800"><i class="fas fa-calendar"></i></div>
+                                    <div>
+                                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Performance Date</p>
+                                        <p class="font-bold dark:text-white">${new Date(data.performance_date).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-white dark:bg-gray-900 flex items-center justify-center text-purple-500 shadow-sm border border-gray-100 dark:border-gray-800"><i class="fas fa-map-marker-alt"></i></div>
+                                    <div>
+                                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Venue & Location</p>
+                                        <p class="font-bold dark:text-white">${data.venue}, ${data.location || 'Unknown'}</p>
+                                    </div>
+                                </div>
+                                ${data.concert ? `
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-white dark:bg-gray-900 flex items-center justify-center text-orange-500 shadow-sm border border-gray-100 dark:border-gray-800"><i class="fas fa-ticket-alt"></i></div>
+                                    <div>
+                                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tour</p>
+                                        <p class="font-bold dark:text-white">${data.concert}</p>
+                                    </div>
+                                </div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-gray-900 rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100 dark:border-gray-800">
+                        ${setsHtml || `<p class="text-center py-10 text-gray-400 font-medium">No songs recorded yet.</p>`}
+                    </div>
+                </div>
             </div>
-        </div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            <div>
-                <h3 class="text-xl font-black dark:text-white uppercase tracking-widest text-indigo-500 mb-6">SETLIST</h3>
-                <div class="space-y-1">${songsHtml}</div>
-            </div>
-            <div>
-                <h3 class="text-xl font-black dark:text-white uppercase tracking-widest text-purple-500 mb-6">COMMENTS</h3>
-                <div class="space-y-4 mb-8">${comments.map(c => `<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl"><div class="flex justify-between mb-1"><span class="text-xs font-black text-indigo-500">${c.user_email}</span><span class="text-[10px] text-gray-400">${new Date(c.created_at).toLocaleDateString()}</span></div><p class="text-sm dark:text-gray-200">${c.content}</p></div>`).join('')}</div>
-                ${session ? `<div class="flex gap-2"><input id="comm-input" type="text" placeholder="후기를 남겨보세요..." class="flex-1 px-5 py-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 dark:text-white outline-none"><button onclick="postComment('${data.id}')" class="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black shadow-lg">전송</button></div>` : ''}
+
+            <div class="lg:col-span-4 space-y-8">
+                <div>
+                    <h3 class="text-lg font-black dark:text-white mb-6 flex items-center gap-2"><i class="fas fa-comments text-indigo-500"></i> Fan Comments</h3>
+                    <div class="space-y-4 mb-6">
+                        ${comments.length > 0 ? comments.map(c => `
+                            <div class="p-5 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-xs font-black text-indigo-500">${c.user_email.split('@')[0]}</span>
+                                    <span class="text-[10px] text-gray-400">${new Date(c.created_at).toLocaleDateString()}</span>
+                                </div>
+                                <p class="text-sm dark:text-gray-300 leading-relaxed">${c.content}</p>
+                            </div>
+                        `).join('') : '<p class="text-center py-6 text-gray-400 text-sm font-medium">Be the first to comment!</p>'}
+                    </div>
+                    ${session ? `
+                        <div class="flex flex-col gap-2">
+                            <textarea id="comm-input" placeholder="Share your experience..." class="w-full px-5 py-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none text-sm" rows="3"></textarea>
+                            <button onclick="postComment('${data.id}')" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg hover:bg-indigo-700 active:scale-[0.98] transition-all">Post Comment</button>
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <div class="p-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2.5rem] text-white shadow-xl">
+                    <h4 class="font-black text-xl mb-3 leading-tight">Missing Information?</h4>
+                    <p class="text-indigo-100 text-sm mb-6 leading-relaxed">Help other fans by adding missing songs or fixing details of this setlist.</p>
+                    <button onclick="startEdit()" class="w-full py-3 bg-white/20 backdrop-blur-md border border-white/30 text-white rounded-xl font-bold hover:bg-white/30 transition-all">Edit Setlist</button>
+                </div>
             </div>
         </div>
     `;
+}
 }
 
 window.handleLike = async (id) => {
