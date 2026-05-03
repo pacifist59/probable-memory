@@ -97,13 +97,23 @@ window.handleCheckAuthBeforeAdd = async () => {
 window.handleLike = async (id) => { 
     const { data: { session } } = await sb.auth.getSession(); 
     if (!session) return window.toggleAuthModal(true); 
-    const { error } = await sb.from('likes').insert({ setlist_id: id, user_id: session.user.id }); 
-    if (error) {
-        if (error.code === '23505') window.showToast('이미 관람 완료한 공연입니다.', 'error');
-        else window.showToast('오류가 발생했습니다.', 'error');
+
+    const { data: existing } = await sb.from('likes').select('*').eq('setlist_id', id).eq('user_id', session.user.id).single();
+
+    if (existing) {
+        const { error } = await sb.from('likes').delete().eq('id', existing.id);
+        if (error) window.showToast('취소 처리 중 오류가 발생했습니다.', 'error');
+        else {
+            window.showToast('공연 관람 기록이 취소되었습니다.');
+            renderSetlistDetailPage(id);
+        }
     } else {
-        window.showToast('공연 관람 기록이 저장되었습니다!');
-        renderSetlistDetailPage(id); 
+        const { error } = await sb.from('likes').insert({ setlist_id: id, user_id: session.user.id }); 
+        if (error) window.showToast('기록 저장 중 오류가 발생했습니다.', 'error');
+        else {
+            window.showToast('공연 관람 기록이 저장되었습니다!');
+            renderSetlistDetailPage(id); 
+        }
     }
 }
 
