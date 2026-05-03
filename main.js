@@ -3,7 +3,6 @@ const SUPABASE_URL = 'https://yyjghcsnomwvqwpaojug.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5amdoY3Nub213dnF3cGFvanVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2NzQzNzAsImV4cCI6MjA5MDI1MDM3MH0.HANV95lxI1XgXTALkqXDbe_-U2-_yB2xJD4Zsb-pqf0';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let allSetlists = []; 
 let editingId = null;
 
 // --- Global UI Handlers ---
@@ -50,6 +49,52 @@ window.toggleModal = (s) => {
         if (title) title.innerText = '새 선곡표 등록';
         if (btn) btn.innerText = '등록하기';
     }
+}
+
+window.toggleAuthModal = (s) => { 
+    document.getElementById('auth-modal').classList.toggle('hidden', !s); 
+}
+
+window.handleSocialLogin = async (p) => { 
+    await sb.auth.signInWithOAuth({ provider: p, options: { redirectTo: window.location.origin } }); 
+}
+
+window.handleCheckAuthBeforeAdd = async () => { 
+    const { data: { session } } = await sb.auth.getSession(); 
+    if (!session) window.toggleAuthModal(true); 
+    else window.toggleModal(true); 
+}
+
+window.handleLike = async (id) => { 
+    const { data: { session } } = await sb.auth.getSession(); 
+    if (!session) return window.toggleAuthModal(true); 
+    await sb.from('likes').insert({ setlist_id: id, user_id: session.user.id }); 
+    renderSetlistDetailPage(id); 
+}
+
+window.startEdit = async (id) => {
+    const { data, error } = await sb.from('setlists').select('*').eq('id', id).single();
+    if (error || !data) return alert('데이터를 불러올 수 없습니다.');
+    
+    editingId = id;
+    const f = document.getElementById('setlist-form');
+    if (!f) return;
+    
+    f.artist.value = data.artist || '';
+    f.category.value = data.category || 'Concert';
+    f.performance_date.value = data.performance_date || '';
+    f.concert.value = data.concert || '';
+    f.venue.value = data.venue || '';
+    f.location.value = data.location || '';
+    f.songs_text.value = data.songs ? data.songs.join('\n') : '';
+    
+    const modal = document.getElementById('add-modal');
+    const title = modal.querySelector('h3');
+    const btn = modal.querySelector('button[type="submit"]');
+    if (title) title.innerText = '선곡표 수정';
+    if (btn) btn.innerText = '수정 완료';
+    
+    window.toggleModal(true);
 }
 
 // --- Routing System ---
@@ -235,7 +280,6 @@ async function renderDetailView(data, likeCount, comments, targetId) {
             <div class="space-y-1">
                 ${set.songs.map((s, i) => {
                     const query = encodeURIComponent(`${data.artist} ${s.title} Official`);
-                    // Use watch link with search-to-video jump (approx direct play)
                     const youtubeLink = `https://www.youtube.com/results?search_query=${query}&sp=EgIQAQ%253D%253D`;
                     return `
                         <div class="flex items-start gap-4 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800/50 group transition-all">
@@ -291,38 +335,62 @@ async function updateAuthUI() {
 
     if (session) {
         const name = session.user.user_metadata?.display_name || session.user.email.split('@')[0];
-        const userHtml = `<div class="flex items-center gap-3 bg-gray-100 dark:bg-gray-800 pl-2 pr-4 py-1.5 rounded-2xl cursor-pointer" onclick="window.navigateTo('profile')"><img src="${session.user.user_metadata?.avatar_url || 'https://ui-avatars.com/api/?name='+name}" class="w-8 h-8 rounded-xl shadow-sm"><span class="text-sm font-black hidden lg:inline">${name}</span></div>`;
-        container.innerHTML = `<div class="flex items-center gap-3"><button onclick="window.navigateTo('myattended')" class="text-xs font-black text-gray-500 hover:text-indigo-600 hidden sm:block">내 공연</button>${userHtml}<button onclick="sb.auth.signOut(); location.reload();" class="text-xs font-black text-red-500 hidden sm:block">로그아웃</button></div>`;
+        const avatar = session.user.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${name}`;
+        
+        container.innerHTML = `
+            <div class="flex items-center gap-3">
+                <button onclick="window.navigateTo('myattended')" class="text-xs font-black text-gray-500 hover:text-indigo-600 hidden sm:block">내 공연</button>
+                <div class="flex items-center gap-3 bg-gray-100 dark:bg-gray-800 pl-2 pr-4 py-1.5 rounded-2xl cursor-pointer" onclick="window.navigateTo('profile')">
+                    <img src="${avatar}" class="w-8 h-8 rounded-xl shadow-sm">
+                    <span class="text-sm font-black hidden lg:inline">${name}</span>
+                </div>
+                <button onclick="sb.auth.signOut().then(() => location.reload())" class="text-xs font-black text-red-500 hidden sm:block">로그아웃</button>
+            </div>`;
+            
         if (mobileSection) {
             mobileSection.innerHTML = `
                 <button onclick="window.navigateTo('myattended')" class="w-full p-5 rounded-2xl font-black bg-gray-100 dark:bg-gray-800 text-left flex justify-between">내 공연 기록 <i class="fas fa-chevron-right text-gray-300"></i></button>
                 <button onclick="window.navigateTo('profile')" class="w-full p-5 rounded-2xl font-black bg-gray-100 dark:bg-gray-800 text-left flex justify-between">개인 정보 수정 <i class="fas fa-chevron-right text-gray-300"></i></button>
-                <button onclick="sb.auth.signOut(); location.reload();" class="w-full p-5 rounded-2xl font-black bg-red-50 text-red-500 text-left">로그아웃</button>
+                <button onclick="sb.auth.signOut().then(() => location.reload())" class="w-full p-5 rounded-2xl font-black bg-red-50 text-red-500 text-left">로그아웃</button>
             `;
         }
     } else {
-        container.innerHTML = `<button onclick="window.toggleAuthModal(true)" class="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black shadow-lg">로그인</button>`;
-        if (mobileSection) mobileSection.innerHTML = `<button onclick="window.toggleAuthModal(true)" class="w-full p-6 bg-indigo-600 text-white rounded-3xl font-black text-xl shadow-xl">로그인하기</button>`;
+        const loginBtn = `<button onclick="window.toggleAuthModal(true)" class="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black shadow-lg">로그인</button>`;
+        container.innerHTML = loginBtn;
+        if (mobileSection) mobileSection.innerHTML = loginBtn.replace('px-8 py-3 rounded-2xl', 'p-6 rounded-3xl w-full text-xl shadow-xl');
     }
 }
 
 window.postComment = async (id) => {
-    const input = document.getElementById('comm-input'); const content = input.value.trim(); if (!content) return;
-    const { data: { session } } = await sb.auth.getSession(); if (!session) return alert('로그인 필요');
+    const input = document.getElementById('comm-input'); 
+    const content = input.value.trim(); 
+    if (!content) return;
+    const { data: { session } } = await sb.auth.getSession(); 
+    if (!session) return alert('로그인 필요');
     const nickname = session.user.user_metadata?.display_name || session.user.email.split('@')[0];
     
-    // Save to DB and refresh
-    const { error } = await sb.from('comments').insert({ setlist_id: id, user_id: session.user.id, user_email: session.user.email, content: content, display_name: nickname });
-    if (error) await sb.from('comments').insert({ setlist_id: id, user_id: session.user.id, user_email: session.user.email, content: content });
+    const { error } = await sb.from('comments').insert({ 
+        setlist_id: id, 
+        user_id: session.user.id, 
+        user_email: session.user.email, 
+        content: content, 
+        display_name: nickname 
+    });
     
-    input.value = ''; renderSetlistDetailPage(id);
+    if (error) console.error('Comment error:', error);
+    input.value = ''; 
+    renderSetlistDetailPage(id);
 }
 
 // --- Utils ---
 
 function renderSetlistCards(data, targetId, isUpcoming = false) {
-    const list = document.getElementById(targetId); if (!list) return;
-    if (!data?.length) { list.innerHTML = `<div class="text-center py-20 bg-white dark:bg-gray-900 rounded-[3rem] border-2 border-dashed dark:border-gray-800 text-gray-400 font-bold text-xl">데이터가 없습니다.</div>`; return; }
+    const list = document.getElementById(targetId); 
+    if (!list) return;
+    if (!data?.length) { 
+        list.innerHTML = `<div class="text-center py-20 bg-white dark:bg-gray-900 rounded-[3rem] border-2 border-dashed dark:border-gray-800 text-gray-400 font-bold text-xl">데이터가 없습니다.</div>`; 
+        return; 
+    }
     list.innerHTML = data.map(item => `
         <div onclick="window.navigateTo('setlist', '${item.id}')" class="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-2xl transition-all cursor-pointer flex justify-between items-center group">
             <div class="flex items-center gap-8">
@@ -343,11 +411,16 @@ function renderSetlistCards(data, targetId, isUpcoming = false) {
 
 async function loadTrendingArtists() {
     const { data } = await sb.from('setlists').select('artist');
-    const counts = {}; data.forEach(d => counts[d.artist] = (counts[d.artist] || 0) + 1);
+    const counts = {}; 
+    data?.forEach(d => counts[d.artist] = (counts[d.artist] || 0) + 1);
     const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0, 5);
     const container = document.getElementById('trending-artists');
     if (container) {
-        container.innerHTML = sorted.map(([name, count], i) => `<li class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black cursor-pointer hover:bg-indigo-600 hover:text-white transition-all" onclick="window.navigateTo('setlists', 'artist:${name}')"><span>${i+1}. ${name}</span><span class="text-sm opacity-50">${count}</span></li>`).join('');
+        container.innerHTML = sorted.map(([name, count], i) => `
+            <li class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black cursor-pointer hover:bg-indigo-600 hover:text-white transition-all" onclick="window.navigateTo('setlists', 'artist:${name}')">
+                <span>${i+1}. ${name}</span>
+                <span class="text-sm opacity-50">${count}</span>
+            </li>`).join('');
     }
 }
 
@@ -367,9 +440,15 @@ async function renderProfilePage() {
             </form>
         </div>`;
     document.getElementById('profile-form').onsubmit = async (e) => {
-        e.preventDefault(); const newName = document.getElementById('profile-nickname').value;
+        e.preventDefault(); 
+        const newName = document.getElementById('profile-nickname').value;
         const { error } = await sb.auth.updateUser({ data: { display_name: newName } });
-        if (error) alert('오류 발생'); else { alert('변경 완료!'); updateAuthUI(); window.navigateTo('home'); }
+        if (error) alert('오류 발생'); 
+        else { 
+            alert('변경 완료!'); 
+            updateAuthUI(); 
+            window.navigateTo('home'); 
+        }
     };
 }
 
@@ -377,7 +456,7 @@ async function renderMyAttendancePage() {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return window.navigateTo('home');
     const { data: att } = await sb.from('likes').select('setlist_id').eq('user_id', session.user.id);
-    const ids = att.map(a => a.setlist_id);
+    const ids = att?.map(a => a.setlist_id) || [];
     const { data: list } = await sb.from('setlists').select('*').in('id', ids).order('performance_date', { ascending: false });
     document.getElementById('page-router').innerHTML = `<h2 class="text-4xl font-black mb-12">내가 다녀온 공연</h2><div class="space-y-6" id="my-list"></div>`;
     renderSetlistCards(list || [], 'my-list');
@@ -385,7 +464,8 @@ async function renderMyAttendancePage() {
 
 // --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
-    updateAuthUI(); handleRouting();
+    updateAuthUI(); 
+    handleRouting();
     document.getElementById('setlist-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const { data: { session } } = await sb.auth.getSession();
@@ -398,7 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (imgInput?.files?.[0]) {
             const file = imgInput.files[0];
             const fileName = `${Date.now()}_${file.name}`;
-            const { data: up, error: err } = await sb.storage.from('posters').upload(fileName, file);
+            const { error: err } = await sb.storage.from('posters').upload(fileName, file);
             if (!err) {
                 imageUrl = sb.storage.from('posters').getPublicUrl(fileName).data.publicUrl;
             } else {
@@ -436,34 +516,3 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
-
-window.handleSocialLogin = async (p) => { await sb.auth.signInWithOAuth({ provider: p, options: { redirectTo: window.location.origin } }); }
-window.toggleAuthModal = (s) => { document.getElementById('auth-modal').classList.toggle('hidden', !s); }
-window.toggleModal = (s) => { document.getElementById('add-modal').classList.toggle('hidden', !s); }
-window.startEdit = async (id) => {
-    const { data, error } = await sb.from('setlists').select('*').eq('id', id).single();
-    if (error || !data) return alert('데이터를 불러올 수 없습니다.');
-    
-    editingId = id;
-    const f = document.getElementById('setlist-form');
-    if (!f) return;
-    
-    f.artist.value = data.artist || '';
-    f.category.value = data.category || 'Concert';
-    f.performance_date.value = data.performance_date || '';
-    f.concert.value = data.concert || '';
-    f.venue.value = data.venue || '';
-    f.location.value = data.location || '';
-    f.songs_text.value = data.songs ? data.songs.join('\n') : '';
-    
-    const modal = document.getElementById('add-modal');
-    const title = modal.querySelector('h3');
-    const btn = modal.querySelector('button[type="submit"]');
-    if (title) title.innerText = '선곡표 수정';
-    if (btn) btn.innerText = '수정 완료';
-    
-    window.toggleModal(true);
-}
-
-window.handleCheckAuthBeforeAdd = async () => { const { data: { session } } = await sb.auth.getSession(); if (!session) window.toggleAuthModal(true); else window.toggleModal(true); }
-window.handleLike = async (id) => { const { data: { session } } = await sb.auth.getSession(); if (!session) return window.toggleAuthModal(true); await sb.from('likes').insert({ setlist_id: id, user_id: session.user.id }); renderSetlistDetailPage(id); }
