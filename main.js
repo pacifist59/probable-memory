@@ -185,6 +185,28 @@ function initGlobalSearch() {
     });
 }
 
+window.showSkeleton = (containerId, count = 3) => {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const skeletons = Array(count).fill(0).map(() => `
+        <div class="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 flex justify-between items-center animate-pulse-subtle">
+            <div class="flex items-center gap-8">
+                <div class="w-20 h-20 bg-gray-200 dark:bg-gray-800 rounded-3xl"></div>
+                <div class="space-y-3">
+                    <div class="h-4 bg-gray-200 dark:bg-gray-800 rounded w-24"></div>
+                    <div class="h-8 bg-gray-200 dark:bg-gray-800 rounded w-48"></div>
+                    <div class="h-4 bg-gray-200 dark:bg-gray-800 rounded w-32"></div>
+                </div>
+            </div>
+            <div class="hidden sm:block space-y-3">
+                <div class="h-6 bg-gray-200 dark:bg-gray-800 rounded w-32"></div>
+                <div class="h-4 bg-gray-200 dark:bg-gray-800 rounded w-20 ml-auto"></div>
+            </div>
+        </div>
+    `).join('');
+    container.innerHTML = skeletons;
+}
+
 // --- Routing System ---
 const routes = {
     home: renderHomePage,
@@ -212,11 +234,15 @@ async function handleRouting() {
     const routerContainer = document.getElementById('page-router');
     if (!routerContainer) return;
     
-    routerContainer.innerHTML = `<div class="flex justify-center py-20"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>`;
+    // Smooth transition
+    routerContainer.classList.remove('animate-fade-in');
+    routerContainer.innerHTML = `<div id="router-skeleton" class="space-y-6"></div>`;
+    window.showSkeleton('router-skeleton', 5);
 
     if (routes[page]) await routes[page](id);
     else await routes.home();
     
+    routerContainer.classList.add('animate-fade-in');
     window.scrollTo(0, 0);
 }
 
