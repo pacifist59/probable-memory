@@ -116,6 +116,7 @@
                     <a href="#/artists" class="text-gray-500 dark:text-gray-400 font-bold hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">아티스트</a>
                     <a href="#/festivals" class="text-gray-500 dark:text-gray-400 font-bold hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">페스티벌</a>
                     <a href="#/venues" class="text-gray-500 dark:text-gray-400 font-bold hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">공연장</a>
+                    <button onclick="window.handleCheckAuthBeforeAdd()" class="text-indigo-600 dark:text-indigo-400 font-black hover:scale-105 transition-transform"><i class="fas fa-plus-circle mr-1"></i> 등록</button>
                 </div>
                 <!-- Global Search -->
                 <div class="hidden md:flex relative group">
@@ -148,6 +149,7 @@
             <a href="#/festivals" onclick="window.toggleMobileMenu(false)" class="p-4 rounded-2xl text-xl font-black text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all">페스티벌</a>  
             <a href="#/venues" onclick="window.toggleMobileMenu(false)" class="p-4 rounded-2xl text-xl font-black text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all">공연장</a>        
             <a href="#/stats" onclick="window.toggleMobileMenu(false)" class="p-4 rounded-2xl text-xl font-black text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all">통계</a>
+            <button onclick="window.handleCheckAuthBeforeAdd()" class="p-4 rounded-2xl text-xl font-black text-indigo-600 dark:text-indigo-400 text-left hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all"><i class="fas fa-plus-circle mr-2"></i>선곡표 등록</button>
         </nav>
         <div id="mobile-auth-section" class="pt-8 border-t border-gray-100 dark:border-gray-800 space-y-4"></div>
     </div>
