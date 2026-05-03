@@ -253,28 +253,67 @@ async function renderHomePage() {
     const { data: recent } = await sb.from('setlists').select('*').lte('performance_date', today).order('performance_date', { ascending: false }).limit(5);
     const { data: upcoming } = await sb.from('setlists').select('*').gt('performance_date', today).order('performance_date', { ascending: true }).limit(3);
     
+    // Phase 2: Dynamic Hero Update
+    const heroContent = document.getElementById('hero-dynamic-content');
+    const heroBg = document.getElementById('hero-background');
+    
+    if (recent?.[0]) {
+        const feat = recent[0];
+        if (heroBg) heroBg.style.backgroundImage = feat.image_url ? `url('${feat.image_url}')` : `url('https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=1920&q=80')`;
+        if (heroContent) {
+            heroContent.innerHTML = `
+                <div class="inline-block px-4 py-1.5 bg-indigo-600/80 backdrop-blur-md rounded-full text-white text-[10px] font-black mb-6 uppercase tracking-[0.3em] animate-fade-in">Featured Setlist</div>
+                <h2 class="text-4xl md:text-6xl font-black mb-4 tracking-tighter leading-tight">${feat.artist}</h2>
+                <p class="text-xl md:text-2xl mb-10 text-indigo-100/90 font-bold italic">${feat.concert}</p>
+                <div class="flex flex-col sm:flex-row justify-center gap-4">
+                    <button onclick="window.navigateTo('setlist', '${feat.id}')" class="bg-white text-indigo-900 px-10 py-4 rounded-2xl font-black text-lg hover:scale-105 transition-all shadow-2xl">지금 확인하기</button>
+                    <button onclick="window.navigateTo('setlists')" class="bg-indigo-600/40 backdrop-blur-lg text-white border border-white/20 px-10 py-4 rounded-2xl font-black text-lg hover:bg-white/20 transition-all">전체 목록 보기</button>
+                </div>
+            `;
+        }
+    }
+
     const routerContainer = document.getElementById('page-router');
     routerContainer.innerHTML = `
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-16 animate-fade-in">
-            <div class="lg:col-span-2 space-y-20">
-                <div>
-                    <div class="flex items-center justify-between mb-10">
-                        <h2 class="text-4xl font-black tracking-tight">최근 개최 공연</h2>
-                        <a href="#/setlists" class="text-indigo-600 font-bold hover:underline">전체 보기</a>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 sm:gap-20">
+            <div class="lg:col-span-8 space-y-24">
+                <section>
+                    <div class="flex items-end justify-between mb-12 border-b-4 border-indigo-600 pb-4">
+                        <div>
+                            <p class="text-indigo-600 dark:text-indigo-400 font-black text-xs uppercase tracking-[0.3em] mb-2">Live Archives</p>
+                            <h2 class="text-5xl sm:text-6xl font-black tracking-tighter">최근 개최 공연</h2>
+                        </div>
+                        <a href="#/setlists" class="group flex items-center gap-2 text-gray-400 hover:text-indigo-600 font-black transition-colors mb-2">
+                            전체 보기 <i class="fas fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
+                        </a>
                     </div>
-                    <div class="space-y-6" id="recent-list"></div>
-                </div>
-                <div>
-                    <h2 class="text-4xl font-black tracking-tight mb-10">개최 예정 공연</h2>
-                    <div class="space-y-6" id="upcoming-list"></div>
-                </div>
+                    <div class="space-y-8" id="recent-list"></div>
+                </section>
+                
+                <section class="bg-gray-900 dark:bg-black rounded-[4rem] p-10 sm:p-16 text-white overflow-hidden relative group">
+                    <div class="absolute top-0 right-0 w-64 h-64 bg-indigo-600/20 blur-[100px] -mr-32 -mt-32"></div>
+                    <div class="relative z-10">
+                        <div class="flex items-center gap-4 mb-10">
+                            <div class="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-xl animate-bounce"><i class="fas fa-calendar-star"></i></div>
+                            <h2 class="text-4xl font-black tracking-tighter">개최 예정 공연</h2>
+                        </div>
+                        <div class="space-y-6" id="upcoming-list"></div>
+                    </div>
+                </section>
             </div>
-            <div class="space-y-10">
-                <div class="bg-white dark:bg-gray-900 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-800 shadow-xl">
-                    <h3 class="text-2xl font-black mb-8">인기 아티스트</h3>
-                    <ul class="space-y-6" id="trending-artists"></ul>
+            
+            <aside class="lg:col-span-4 space-y-12">
+                <div class="bg-white dark:bg-gray-900 p-10 rounded-[3.5rem] border-2 border-indigo-50 dark:border-gray-800 shadow-xl sticky top-32">
+                    <div class="flex items-center gap-3 mb-10">
+                        <span class="text-3xl text-yellow-500"><i class="fas fa-fire-alt"></i></span>
+                        <h3 class="text-2xl font-black tracking-tight">실시간 인기 아티스트</h3>
+                    </div>
+                    <ul class="space-y-4" id="trending-artists"></ul>
+                    <div class="mt-10 pt-8 border-t dark:border-gray-800">
+                        <button onclick="window.navigateTo('stats')" class="w-full py-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black text-gray-500 hover:bg-indigo-600 hover:text-white transition-all">전체 랭킹 보기</button>
+                    </div>
                 </div>
-            </div>
+            </aside>
         </div>
     `;
     renderSetlistCards(recent || [], 'recent-list');
@@ -372,7 +411,20 @@ async function renderSetlistDetailPage(id) {
     const { count: likeCount } = await sb.from('likes').select('*', { count: 'exact', head: true }).eq('setlist_id', id);
     const { data: comments } = await sb.from('comments').select('*').eq('setlist_id', id).order('created_at', { ascending: true });
     
-    document.getElementById('page-router').innerHTML = `<div id="detail-full-view"></div>`;
+    // Spotify/Songkick style detail view
+    document.getElementById('page-router').innerHTML = `
+        <div id="detail-view" class="animate-fade-in">
+            <!-- Social Floating Bar (Mobile) -->
+            <div class="lg:hidden fixed bottom-6 left-6 right-6 z-[100] flex gap-3">
+                <button onclick="window.handleLike('${data.id}')" class="flex-1 py-5 bg-pink-500 text-white rounded-[2rem] font-black shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all">
+                    <i class="fas fa-heart"></i> 관람 완료 <span>${likeCount}</span>
+                </button>
+                <button onclick="window.shareSetlist('${data.id}', '${data.artist}')" class="w-16 h-16 bg-white dark:bg-gray-800 rounded-full shadow-2xl flex items-center justify-center text-gray-500">
+                    <i class="fas fa-share-alt"></i>
+                </button>
+            </div>
+            <div id="detail-full-view"></div>
+        </div>`;
     renderDetailView(data, likeCount || 0, comments || [], 'detail-full-view');
 }
 
@@ -454,6 +506,15 @@ async function renderDetailView(data, likeCount, comments, targetId) {
         </div>`;
 }
 
+window.shareSetlist = (id, artist) => {
+    const url = window.location.href;
+    if (navigator.share) {
+        navigator.share({ title: `${artist} 공연 선곡표`, text: '선곡표에서 공연 기록을 확인해보세요!', url });
+    } else {
+        navigator.clipboard.writeText(url).then(() => window.showToast('링크가 복사되었습니다.'));
+    }
+}
+
 // --- Auth & User Logic ---
 
 async function updateAuthUI() {
@@ -525,26 +586,40 @@ function renderSetlistCards(data, targetId, isUpcoming = false) {
         list.innerHTML = `<div class="text-center py-20 bg-white dark:bg-gray-900 rounded-[3rem] border-2 border-dashed dark:border-gray-800 text-gray-400 font-bold text-xl">데이터가 없습니다.</div>`; 
         return; 
     }
+    
     list.innerHTML = data.map(item => {
         const categoryColor = item.category === 'Festival' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400';
+        const imageHtml = item.image_url 
+            ? `<img src="${item.image_url}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">` 
+            : `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-3xl"><i class="fas fa-microphone-alt"></i></div>`;
+
         return `
-        <div onclick="window.navigateTo('setlist', '${item.id}')" class="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-2xl transition-all cursor-pointer flex justify-between items-center group animate-fade-in">
-            <div class="flex items-center gap-8">
-                <div class="w-20 h-20 bg-indigo-50 dark:bg-gray-800 rounded-3xl flex items-center justify-center text-indigo-600 text-3xl group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner overflow-hidden flex-shrink-0">
-                    ${item.image_url ? `<img src="${item.image_url}" class="w-full h-full object-cover">` : '<i class="fas fa-microphone-alt"></i>'}
+        <div onclick="window.navigateTo('setlist', '${item.id}')" class="bg-white dark:bg-gray-900 p-6 sm:p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer flex flex-col sm:flex-row justify-between sm:items-center gap-6 group animate-fade-in">
+            <div class="flex items-center gap-6 sm:gap-8">
+                <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden shadow-inner flex-shrink-0 relative">
+                    <div class="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors z-10"></div>
+                    ${imageHtml}
                 </div>
-                <div>
-                    <div class="flex items-center gap-3 mb-2">
+                <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2 mb-3">
                         <span class="px-3 py-1 ${categoryColor} rounded-full text-[10px] font-black uppercase tracking-widest">${item.category || 'Concert'}</span>
-                        <span class="text-xs font-black text-gray-300 uppercase tracking-tighter">${item.performance_date}</span>
+                        <span class="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
+                            <i class="far fa-calendar-alt"></i> ${item.performance_date}
+                        </span>
                     </div>
-                    <h3 class="font-black text-3xl tracking-tighter dark:text-white group-hover:text-indigo-600 transition-colors leading-tight">${item.artist}</h3>
-                    <p class="text-lg font-bold text-gray-400 truncate max-w-[200px] md:max-w-md">${item.concert}</p>
+                    <h3 class="font-black text-3xl sm:text-4xl tracking-tighter dark:text-white group-hover:text-indigo-600 transition-colors leading-none mb-3 truncate">${item.artist}</h3>
+                    <p class="text-lg font-bold text-gray-400 dark:text-gray-500 truncate max-w-xs md:max-w-md italic opacity-80">${item.concert}</p>
                 </div>
             </div>
-            <div class="text-right hidden sm:block">
-                <p class="font-black text-xl dark:text-gray-200 mb-1">${item.venue || ''}</p>
-                <p class="text-xs font-black text-gray-300 uppercase tracking-widest">${isUpcoming ? 'Upcoming' : (item.location || '')}</p>
+            <div class="sm:text-right flex flex-col sm:items-end gap-1">
+                <div class="flex items-center gap-2 text-gray-400 dark:text-gray-500 font-bold mb-1">
+                    <i class="fas fa-map-marker-alt text-indigo-400/50"></i>
+                    <span class="text-lg sm:text-xl font-black dark:text-gray-200">${item.venue || 'TBA'}</span>
+                </div>
+                <p class="text-xs font-black text-gray-300 dark:text-gray-600 uppercase tracking-[0.2em]">${isUpcoming ? 'Check-in Now' : (item.location || 'Global')}</p>
+                <div class="mt-4 sm:mt-2 opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0 hidden sm:block">
+                    <span class="bg-indigo-600 text-white px-5 py-2 rounded-full text-xs font-black shadow-lg">상세 보기 <i class="fas fa-arrow-right ml-2"></i></span>
+                </div>
             </div>
         </div>`;
     }).join('');
@@ -558,9 +633,12 @@ async function loadTrendingArtists() {
     const container = document.getElementById('trending-artists');
     if (container) {
         container.innerHTML = sorted.map(([name, count], i) => `
-            <li class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black cursor-pointer hover:bg-indigo-600 hover:text-white transition-all" onclick="window.navigateTo('setlists', 'artist:${name}')">
-                <span>${i+1}. ${name}</span>
-                <span class="text-sm opacity-50">${count}</span>
+            <li class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black cursor-pointer hover:bg-indigo-600 hover:text-white transition-all group" onclick="window.navigateTo('setlists', 'artist:${name}')">
+                <span class="flex items-center gap-3">
+                    <span class="text-indigo-400 opacity-50 group-hover:text-white">0${i+1}</span>
+                    ${name}
+                </span>
+                <span class="px-3 py-1 bg-white dark:bg-gray-700 rounded-full text-[10px] shadow-sm">${count}</span>
             </li>`).join('');
     }
 }
@@ -572,7 +650,7 @@ async function renderProfilePage() {
     if (!session) return window.navigateTo('home');
     const nickname = session.user.user_metadata?.display_name || session.user.email.split('@')[0];
     document.getElementById('page-router').innerHTML = `
-        <div class="max-w-2xl mx-auto bg-white dark:bg-gray-900 p-12 rounded-[3rem] shadow-2xl border dark:border-gray-800">
+        <div class="max-w-2xl mx-auto bg-white dark:bg-gray-900 p-12 rounded-[3rem] shadow-2xl border dark:border-gray-800 animate-fade-in">
             <h2 class="text-4xl font-black mb-10 text-center">개인 정보 설정</h2>
             <form id="profile-form" class="space-y-8">
                 <div><label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">이메일 계정</label><input type="text" value="${session.user.email}" disabled class="w-full px-6 py-5 rounded-2xl bg-gray-50 dark:bg-gray-800 text-gray-400 border-none font-bold"></div>
