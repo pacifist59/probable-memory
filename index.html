@@ -94,12 +94,17 @@
         <div class="max-w-7xl mx-auto px-4 h-full flex justify-between items-center">
             <div class="flex items-center">
                 <a href="#/home" onclick="window.navigateTo('home')" class="text-3xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter italic mr-8">선곡표</a>
-                <div class="hidden xl:flex space-x-6">
+                <div class="hidden xl:flex space-x-6 mr-8">
                     <a href="#/setlists" class="text-gray-500 dark:text-gray-400 font-bold hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">선곡표</a>
                     <a href="#/artists" class="text-gray-500 dark:text-gray-400 font-bold hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">아티스트</a>
                     <a href="#/festivals" class="text-gray-500 dark:text-gray-400 font-bold hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">페스티벌</a>
                     <a href="#/venues" class="text-gray-500 dark:text-gray-400 font-bold hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">공연장</a>
-                    <a href="#/stats" class="text-gray-500 dark:text-gray-400 font-bold hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">통계</a>
+                </div>
+                <!-- Global Search -->
+                <div class="hidden md:flex relative group">
+                    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors"></i>
+                    <input type="text" id="global-search" placeholder="아티스트, 공연장 검색..." class="bg-gray-100 dark:bg-gray-800 border-none rounded-2xl pl-11 pr-4 py-2 text-sm font-bold w-64 focus:ring-2 focus:ring-indigo-500 transition-all outline-none">
+                    <div id="search-results" class="absolute top-full left-0 w-full mt-2 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border dark:border-gray-800 hidden overflow-hidden z-[110]"></div>
                 </div>
             </div>
             <div class="flex items-center gap-2 sm:gap-4">

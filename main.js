@@ -97,6 +97,50 @@ window.startEdit = async (id) => {
     window.toggleModal(true);
 }
 
+// --- Global Search System ---
+function initGlobalSearch() {
+    const input = document.getElementById('global-search');
+    const results = document.getElementById('search-results');
+    if (!input || !results) return;
+
+    let debounceTimer;
+    input.addEventListener('input', (e) => {
+        clearTimeout(debounceTimer);
+        const query = e.target.value.trim();
+        if (query.length < 2) {
+            results.classList.add('hidden');
+            return;
+        }
+
+        debounceTimer = setTimeout(async () => {
+            const { data, error } = await sb.from('setlists')
+                .select('id, artist, concert, performance_date')
+                .or(`artist.ilike.%${query}%,concert.ilike.%${query}%,venue.ilike.%${query}%`)
+                .limit(5);
+
+            if (error || !data?.length) {
+                results.innerHTML = '<div class="p-4 text-sm text-gray-500 text-center">검색 결과가 없습니다.</div>';
+            } else {
+                results.innerHTML = data.map(item => `
+                    <div onclick="window.navigateTo('setlist', '${item.id}'); document.getElementById('search-results').classList.add('hidden'); document.getElementById('global-search').value='';" class="p-4 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer border-b dark:border-gray-800 last:border-none">
+                        <p class="font-black text-indigo-600 text-sm">${item.artist}</p>
+                        <p class="text-xs font-bold text-gray-400 truncate">${item.concert}</p>
+                        <p class="text-[10px] text-gray-300 mt-1">${item.performance_date}</p>
+                    </div>
+                `).join('');
+            }
+            results.classList.remove('hidden');
+        }, 300);
+    });
+
+    // Close results when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!input.contains(e.target) && !results.contains(e.target)) {
+            results.classList.add('hidden');
+        }
+    });
+}
+
 // --- Routing System ---
 const routes = {
     home: renderHomePage,
@@ -190,7 +234,8 @@ async function renderSetlistsPage(filter = null) {
 
 async function renderArtistsPage() {
     const { data } = await sb.from('setlists').select('artist');
-    const counts = {}; data.forEach(d => counts[d.artist] = (counts[d.artist] || 0) + 1);
+    const counts = {}; 
+    data?.forEach(d => counts[d.artist] = (counts[d.artist] || 0) + 1);
     const artists = Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0], 'ko'));
     
     document.getElementById('page-router').innerHTML = `
@@ -208,7 +253,7 @@ async function renderArtistsPage() {
 
 async function renderFestivalsPage() {
     const { data } = await sb.from('setlists').select('*').eq('category', 'Festival').order('performance_date', { ascending: false });
-    const festivals = [...new Set(data.map(d => d.concert))].sort();
+    const festivals = [...new Set(data?.map(d => d.concert) || [])].sort();
     document.getElementById('page-router').innerHTML = `
         <h2 class="text-4xl font-black mb-12">페스티벌 아카이브</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -220,7 +265,7 @@ async function renderFestivalsPage() {
 async function renderVenuesPage() {
     const { data } = await sb.from('setlists').select('venue, location');
     const uniqueVenues = []; const seen = new Set();
-    data.forEach(d => { if (d.venue && !seen.has(d.venue)) { seen.add(d.venue); uniqueVenues.push(d); } });
+    data?.forEach(d => { if (d.venue && !seen.has(d.venue)) { seen.add(d.venue); uniqueVenues.push(d); } });
     document.getElementById('page-router').innerHTML = `
         <h2 class="text-4xl font-black mb-12">공연장 정보</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -231,7 +276,8 @@ async function renderVenuesPage() {
 
 async function renderStatsPage() {
     const { data } = await sb.from('setlists').select('artist');
-    const counts = {}; data.forEach(s => counts[s.artist] = (counts[s.artist] || 0) + 1);
+    const counts = {}; 
+    data?.forEach(s => counts[s.artist] = (counts[s.artist] || 0) + 1);
     const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]);
     document.getElementById('page-router').innerHTML = `
         <div class="bg-white dark:bg-gray-900 p-10 rounded-[3rem] shadow-xl border dark:border-gray-800">
@@ -308,8 +354,12 @@ async function renderDetailView(data, likeCount, comments, targetId) {
                 </div>
             </div>
             <div class="flex gap-3">
-                <button onclick="window.handleLike('${data.id}')" class="px-8 py-4 bg-pink-50 text-pink-500 rounded-2xl font-black shadow-sm active:scale-95"><i class="fas fa-heart mr-2"></i>공연 관람 완료</button>
-                ${session && session.user.id === data.user_id ? `<button onclick="window.startEdit('${data.id}')" class="p-4 bg-gray-100 dark:bg-gray-800 rounded-2xl"><i class="fas fa-edit"></i></button>` : ''}
+                <button onclick="window.handleLike('${data.id}')" class="px-8 py-4 bg-pink-50 text-pink-500 rounded-2xl font-black shadow-sm active:scale-95 transition-all flex items-center gap-2">
+                    <i class="fas fa-heart"></i>
+                    <span>나도 이 공연 봤어요!</span>
+                    <span class="ml-2 px-3 py-1 bg-white/50 rounded-full text-xs">${likeCount}</span>
+                </button>
+                ${session && session.user.id === data.user_id ? `<button onclick="window.startEdit('${data.id}')" class="p-4 bg-gray-100 dark:bg-gray-800 rounded-2xl hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-all"><i class="fas fa-edit"></i></button>` : ''}
             </div>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
@@ -466,6 +516,7 @@ async function renderMyAttendancePage() {
 document.addEventListener('DOMContentLoaded', () => {
     updateAuthUI(); 
     handleRouting();
+    initGlobalSearch();
     document.getElementById('setlist-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const { data: { session } } = await sb.auth.getSession();
