@@ -496,6 +496,17 @@ async function renderDetailView(data, likeCount, comments, targetId) {
                 <div class="lg:col-span-8 bg-white dark:bg-gray-900 p-10 rounded-[3rem] border dark:border-gray-800 shadow-sm">${setsHtml || '등록된 곡이 없습니다.'}</div>
                 <div class="lg:col-span-4 space-y-10">
                     ${data.image_url ? `<div class="bg-white dark:bg-gray-900 p-4 rounded-[3rem] border dark:border-gray-800 shadow-sm overflow-hidden"><img src="${data.image_url}" class="w-full h-auto rounded-[2.5rem] object-cover" alt="공연 포스터"></div>` : ''}
+                    
+                    <!-- Phase 3: Media Spotlight -->
+                    <div class="bg-gray-900 rounded-[2.5rem] p-8 text-white overflow-hidden relative">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-red-600/20 blur-3xl"></div>
+                        <h3 class="text-lg font-black mb-6 flex items-center gap-2"><i class="fab fa-youtube text-red-500"></i> 하이라이트 영상</h3>
+                        <div class="aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl">
+                             <iframe class="w-full h-full" src="https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(data.artist + ' ' + (data.songs?.[0] || '') + ' Live')}" frameborder="0" allowfullscreen></iframe>
+                        </div>
+                        <p class="text-[10px] text-gray-500 mt-4 font-medium uppercase tracking-widest text-center">Auto-generated search for performance clips</p>
+                    </div>
+
                     <div>
                         <h3 class="text-xl font-black mb-8">팬 후기</h3>
                         <div class="space-y-4 mb-8">${comments.map(c => `<div class="p-6 bg-gray-50 dark:bg-gray-800 rounded-[1.5rem] border dark:border-gray-800"><p class="text-xs font-black text-indigo-500 mb-2">${c.display_name || '익명'}</p><p class="text-sm font-medium leading-relaxed">${c.content}</p></div>`).join('')}</div>
@@ -513,6 +524,98 @@ window.shareSetlist = (id, artist) => {
     } else {
         navigator.clipboard.writeText(url).then(() => window.showToast('링크가 복사되었습니다.'));
     }
+}
+
+// --- Phase 3: Statistics Dashboard ---
+async function renderProfilePage() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return window.navigateTo('home');
+    const nickname = session.user.user_metadata?.display_name || session.user.email.split('@')[0];
+
+    // Fetch stats
+    const { data: likes } = await sb.from('likes').select('setlist_id').eq('user_id', session.user.id);
+    const setlistIds = likes?.map(l => l.setlist_id) || [];
+    const { data: myShows } = await sb.from('setlists').select('*').in('id', setlistIds);
+
+    const artistCounts = {};
+    myShows?.forEach(s => artistCounts[s.artist] = (artistCounts[s.artist] || 0) + 1);
+    const topArtist = Object.entries(artistCounts).sort((a,b) => b[1]-a[1])[0]?.[0] || 'N/A';
+    
+    document.getElementById('page-router').innerHTML = `
+        <div class="max-w-5xl mx-auto space-y-12 animate-fade-in">
+            <!-- Header -->
+            <div class="bg-white dark:bg-gray-900 p-10 rounded-[3.5rem] shadow-xl border dark:border-gray-800 flex flex-col md:flex-row items-center gap-10">
+                <img src="${session.user.user_metadata?.avatar_url || 'https://ui-avatars.com/api/?name='+nickname}" class="w-32 h-32 rounded-[2.5rem] shadow-2xl">
+                <div class="text-center md:text-left flex-1">
+                    <h2 class="text-5xl font-black tracking-tighter mb-2">${nickname}</h2>
+                    <p class="text-gray-400 font-bold">${session.user.email}</p>
+                </div>
+                <div class="flex gap-4">
+                    <button onclick="window.navigateTo('myattended')" class="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-500/20 active:scale-95 transition-all">내 아카이브</button>
+                    <button onclick="sb.auth.signOut().then(() => location.reload())" class="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl text-red-500"><i class="fas fa-sign-out-alt"></i></button>
+                </div>
+            </div>
+
+            <!-- Dashboard Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="bg-indigo-600 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-3xl -mr-16 -mt-16 group-hover:bg-white/20 transition-all"></div>
+                    <p class="text-indigo-200 font-black text-xs uppercase tracking-widest mb-2">Total Shows</p>
+                    <h3 class="text-7xl font-black tracking-tighter leading-none">${setlistIds.length}</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-900 rounded-[3rem] p-10 border dark:border-gray-800 shadow-lg">
+                    <p class="text-gray-400 font-black text-xs uppercase tracking-widest mb-2">Top Artist</p>
+                    <h3 class="text-4xl font-black tracking-tight truncate">${topArtist}</h3>
+                    <p class="text-indigo-500 font-bold mt-2">${artistCounts[topArtist] || 0}회 관람</p>
+                </div>
+                <div class="bg-white dark:bg-gray-900 rounded-[3rem] p-10 border dark:border-gray-800 shadow-lg">
+                    <p class="text-gray-400 font-black text-xs uppercase tracking-widest mb-2">Concert Level</p>
+                    <h3 class="text-4xl font-black tracking-tight">${setlistIds.length > 10 ? 'VIP Fan' : (setlistIds.length > 5 ? 'Power Fan' : 'Music Lover')}</h3>
+                    <div class="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded-full mt-4 overflow-hidden">
+                        <div class="bg-indigo-600 h-full" style="width: ${Math.min((setlistIds.length/20)*100, 100)}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Settings -->
+            <div class="bg-white dark:bg-gray-900 p-12 rounded-[3.5rem] shadow-sm border dark:border-gray-800">
+                <h3 class="text-2xl font-black mb-10 flex items-center gap-3"><i class="fas fa-user-cog text-gray-400"></i> 프로필 설정</h3>
+                <form id="profile-form" class="space-y-8">
+                    <div><label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">활동 닉네임</label><input type="text" id="profile-nickname" value="${nickname}" required class="w-full px-8 py-5 rounded-2xl border-2 dark:border-gray-800 dark:bg-gray-800 outline-none focus:border-indigo-600 transition-all font-black text-xl"></div>
+                    <button type="submit" class="w-full bg-gray-900 dark:bg-white dark:text-gray-900 text-white py-6 rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-all">설정 저장하기</button>
+                </form>
+            </div>
+        </div>`;
+
+    document.getElementById('profile-form').onsubmit = async (e) => {
+        e.preventDefault(); 
+        const newName = document.getElementById('profile-nickname').value;
+        const { error } = await sb.auth.updateUser({ data: { display_name: newName } });
+        if (error) window.showToast('설정 저장 중 오류가 발생했습니다.', 'error');
+        else { 
+            window.showToast('프로필이 성공적으로 업데이트되었습니다.'); 
+            updateAuthUI(); 
+            window.navigateTo('home'); 
+        }
+    };
+}
+
+async function renderMyAttendancePage() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return window.navigateTo('home');
+    const { data: att } = await sb.from('likes').select('setlist_id').eq('user_id', session.user.id);
+    const ids = att?.map(a => a.setlist_id) || [];
+    const { data: list } = await sb.from('setlists').select('*').in('id', ids).order('performance_date', { ascending: false });
+    
+    document.getElementById('page-router').innerHTML = `
+        <div class="animate-fade-in space-y-12">
+            <div class="flex items-center justify-between">
+                <h2 class="text-5xl font-black tracking-tighter">My <span class="text-indigo-600 italic">Archive</span></h2>
+                <span class="px-6 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full font-black text-sm">${ids.length}개의 공연</span>
+            </div>
+            <div class="space-y-6" id="my-list"></div>
+        </div>`;
+    renderSetlistCards(list || [], 'my-list');
 }
 
 // --- Auth & User Logic ---
@@ -641,48 +744,6 @@ async function loadTrendingArtists() {
                 <span class="px-3 py-1 bg-white dark:bg-gray-700 rounded-full text-[10px] shadow-sm">${count}</span>
             </li>`).join('');
     }
-}
-
-// --- Profile & Attendance ---
-
-async function renderProfilePage() {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) return window.navigateTo('home');
-    const nickname = session.user.user_metadata?.display_name || session.user.email.split('@')[0];
-    document.getElementById('page-router').innerHTML = `
-        <div class="max-w-2xl mx-auto bg-white dark:bg-gray-900 p-12 rounded-[3rem] shadow-2xl border dark:border-gray-800 animate-fade-in">
-            <h2 class="text-4xl font-black mb-10 text-center">개인 정보 설정</h2>
-            <form id="profile-form" class="space-y-8">
-                <div><label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">이메일 계정</label><input type="text" value="${session.user.email}" disabled class="w-full px-6 py-5 rounded-2xl bg-gray-50 dark:bg-gray-800 text-gray-400 border-none font-bold"></div>
-                <div><label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">활동 닉네임</label><input type="text" id="profile-nickname" value="${nickname}" required class="w-full px-6 py-5 rounded-2xl border dark:border-gray-800 dark:bg-gray-800 outline-none focus:ring-2 focus:ring-indigo-600 transition-all font-black text-xl"></div>
-                <button type="submit" class="w-full bg-indigo-600 text-white py-6 rounded-2xl font-black text-2xl shadow-xl active:scale-95 transition-all">설정 저장하기</button>
-            </form>
-        </div>`;
-    document.getElementById('profile-form').onsubmit = async (e) => {
-        e.preventDefault(); 
-        const newName = document.getElementById('profile-nickname').value;
-        const { error } = await sb.auth.updateUser({ data: { display_name: newName } });
-        if (error) window.showToast('설정 저장 중 오류가 발생했습니다.', 'error');
-        else { 
-            window.showToast('프로필이 성공적으로 업데이트되었습니다.'); 
-            updateAuthUI(); 
-            window.navigateTo('home'); 
-        }
-    };
-}
-
-async function renderMyAttendancePage() {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) return window.navigateTo('home');
-    const { data: att } = await sb.from('likes').select('setlist_id').eq('user_id', session.user.id);
-    const ids = att?.map(a => a.setlist_id) || [];
-    const { data: list } = await sb.from('setlists').select('*').in('id', ids).order('performance_date', { ascending: false });
-    document.getElementById('page-router').innerHTML = `
-        <div class="animate-fade-in">
-            <h2 class="text-4xl font-black mb-12">내가 다녀온 공연</h2>
-            <div class="space-y-6" id="my-list"></div>
-        </div>`;
-    renderSetlistCards(list || [], 'my-list');
 }
 
 // --- Init ---
